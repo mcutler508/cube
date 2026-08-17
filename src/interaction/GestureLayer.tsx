@@ -1,9 +1,10 @@
 import { useThree } from '@react-three/fiber';
 import { useEffect, useRef, type ReactNode } from 'react';
 import * as THREE from 'three';
-import { enqueuePlayerMove } from '../animation/enqueue';
+import { dragController, quarterAngleForMove } from '../animation/dragController';
 import { moveQueue } from '../animation/moveController';
 import { useGameStore } from '../store/gameStore';
+import type { Move } from '../types/cube';
 import {
   findCubieAncestor,
   normalToWorld,
@@ -11,8 +12,16 @@ import {
 } from './raycastHelpers';
 import { resolveLayerTurn } from './gestureResolver';
 
-const LAYER_COMMIT_THRESHOLD_PX = 10;
+const LAYER_RESOLVE_THRESHOLD_PX = 6;
 const ORBIT_SENSITIVITY = 0.007; // radians per pixel
+/**
+ * World-space drag distance on the touched face that maps to a 90° turn.
+ * Higher = layer follows the finger more slowly, easier to stop on target.
+ * A cubie is 1.0 units wide; setting this to ~2.4 means "drag two cubies
+ * worth plus a bit" for a full quarter, which matches the muscle memory of
+ * physical Rubik's apps and makes overshoot much less likely.
+ */
+const DRAG_UNITS_PER_QUARTER = 2.4;
 
 type GestureState =
   | { kind: 'idle' }
@@ -28,6 +37,21 @@ type GestureState =
       faceNormalWorld: THREE.Vector3;
       /** Hit point on the face in world space. */
       hitWorld: THREE.Vector3;
+    }
+  | {
+      kind: 'dragging-layer';
+      pointerId: number;
+      /** Hit point of the initial touch on the face, in world space. */
+      initialHitWorld: THREE.Vector3;
+      /** Face normal in world space (defines the drag plane). */
+      faceNormalWorld: THREE.Vector3;
+      /** Snapped in-plane drag direction in cube-local space. */
+      inPlaneDirLocal: THREE.Vector3;
+      /** Cached inverse of the root group's world quaternion at drag start. */
+      inverseRootQuat: THREE.Quaternion;
+      /** Signed radians of one quarter turn in the drag direction. */
+      quarterAngle: number;
+      primaryMove: Move;
     }
   | {
       kind: 'orbiting';
@@ -85,7 +109,7 @@ export function GestureLayer({ children }: { children: ReactNode }) {
     };
 
     const onPointerDown = (e: PointerEvent) => {
-      if (moveQueue.isBusy()) return; // ignore inputs during animation
+      if (moveQueue.isBusy()) return; // ignore inputs during animation or active drag
       activeTouches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
       // Two-finger touch → orbit with the pair.
@@ -102,7 +126,13 @@ export function GestureLayer({ children }: { children: ReactNode }) {
       if (activeTouches.current.size > 1) return;
 
       const cubeHit = raycastCube(e);
-      if (cubeHit) {
+      // Post-solve / post-objective: still allow orbit (empty-space drag) so
+      // the user can admire the cube, but don't start a layer turn the store
+      // would silently reject.
+      const store = useGameStore.getState();
+      const layerTurnsBlocked =
+        store.phase === 'solved' || store.objectiveCompleted;
+      if (cubeHit && !layerTurnsBlocked) {
         // Compute world-space face normal from mesh-local face normal.
         const meshWorldNormal = normalToWorld(
           cubeHit.hit.object,
@@ -168,7 +198,7 @@ export function GestureLayer({ children }: { children: ReactNode }) {
         const dx = e.clientX - s.startX;
         const dy = e.clientY - s.startY;
         const dist2 = dx * dx + dy * dy;
-        if (dist2 < LAYER_COMMIT_THRESHOLD_PX * LAYER_COMMIT_THRESHOLD_PX) return;
+        if (dist2 < LAYER_RESOLVE_THRESHOLD_PX * LAYER_RESOLVE_THRESHOLD_PX) return;
 
         // Project the current pointer position onto the touched face plane in world space.
         toNDC(e, ndc);
@@ -194,8 +224,9 @@ export function GestureLayer({ children }: { children: ReactNode }) {
         // World-space drag vector on the face plane.
         const worldDrag = tmpVec2.copy(hit).sub(s.hitWorld);
         // Convert to cube-local frame.
-        rootRef.current!.getWorldQuaternion(tmpQuat).invert();
-        const localDrag = worldDrag.applyQuaternion(tmpQuat);
+        const inverseRootQuat = new THREE.Quaternion();
+        rootRef.current!.getWorldQuaternion(inverseRootQuat).invert();
+        const localDrag = worldDrag.clone().applyQuaternion(inverseRootQuat);
 
         // Look up the touched cubie's current logical position.
         const cubie = useGameStore.getState().cubeState.cubies.find(
@@ -205,16 +236,67 @@ export function GestureLayer({ children }: { children: ReactNode }) {
           stateRef.current = { kind: 'idle' };
           return;
         }
-        const move = resolveLayerTurn(s.faceNormalLocal, localDrag, cubie.position);
-        if (move) {
-          enqueuePlayerMove(move);
+        const primaryMove = resolveLayerTurn(
+          s.faceNormalLocal,
+          localDrag,
+          cubie.position,
+        );
+        if (!primaryMove) {
+          // Degenerate (middle slice / degenerate direction). Wait for more
+          // drag rather than committing to orbit — user hasn't lifted yet.
+          return;
         }
-        stateRef.current = { kind: 'idle' };
+
+        // Snap the local drag to its dominant in-plane axis.
+        const inPlaneDirLocal = snapInPlane(localDrag, s.faceNormalLocal);
+        const quarterAngle = quarterAngleForMove(primaryMove);
+
+        const cubies = useGameStore.getState().cubeState.cubies;
+        const live = dragController.start(cubies, primaryMove);
+        if (!live) {
+          stateRef.current = { kind: 'idle' };
+          return;
+        }
+
+        // Seed the initial angle from the drag we've already accumulated so
+        // there's no visual jump on first frame.
+        const d = localDrag.dot(inPlaneDirLocal);
+        dragController.updateAngle(d * (quarterAngle / DRAG_UNITS_PER_QUARTER));
+
+        stateRef.current = {
+          kind: 'dragging-layer',
+          pointerId: e.pointerId,
+          initialHitWorld: s.hitWorld.clone(),
+          faceNormalWorld: s.faceNormalWorld.clone(),
+          inPlaneDirLocal,
+          inverseRootQuat,
+          quarterAngle,
+          primaryMove,
+        };
+        return;
+      }
+
+      if (s.kind === 'dragging-layer' && e.pointerId === s.pointerId) {
+        toNDC(e, ndc);
+        const hit = raycastToPlane(
+          ndc,
+          camera,
+          s.initialHitWorld,
+          s.faceNormalWorld,
+          raycasterRef.current,
+          planeRef.current,
+          tmpVec,
+        );
+        if (!hit) return; // ray parallel to face for a frame — skip.
+        const worldDrag = tmpVec2.copy(hit).sub(s.initialHitWorld);
+        const localDrag = worldDrag.applyQuaternion(s.inverseRootQuat);
+        const d = localDrag.dot(s.inPlaneDirLocal);
+        dragController.updateAngle(d * (s.quarterAngle / DRAG_UNITS_PER_QUARTER));
         return;
       }
     };
 
-    const endPointer = (e: PointerEvent) => {
+    const endPointer = (e: PointerEvent, canceled = false) => {
       activeTouches.current.delete(e.pointerId);
       const s = stateRef.current;
       if (s.kind === 'two-finger-orbit') {
@@ -232,6 +314,16 @@ export function GestureLayer({ children }: { children: ReactNode }) {
             stateRef.current = { kind: 'idle' };
           }
         }
+      } else if (s.kind === 'dragging-layer' && s.pointerId === e.pointerId) {
+        if (canceled) {
+          dragController.abort();
+        } else {
+          dragController.release((move) => {
+            if (!move) return;
+            useGameStore.getState().commitPlayerMove(move);
+          });
+        }
+        stateRef.current = { kind: 'idle' };
       } else if (
         (s.kind === 'orbiting' || s.kind === 'possible-layer-turn') &&
         s.pointerId === e.pointerId
@@ -247,19 +339,22 @@ export function GestureLayer({ children }: { children: ReactNode }) {
       }
     };
 
+    const onPointerUp = (e: PointerEvent) => endPointer(e, false);
+    const onPointerCancel = (e: PointerEvent) => endPointer(e, true);
+
     // pointermove/up are on window so we still receive them if the pointer
     // strays off the canvas mid-drag (pointer capture also helps but window
     // listeners are a belt-and-suspenders fallback for some browsers).
     canvas.addEventListener('pointerdown', onPointerDown);
     window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', endPointer);
-    window.addEventListener('pointercancel', endPointer);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerCancel);
 
     return () => {
       canvas.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', endPointer);
-      window.removeEventListener('pointercancel', endPointer);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerCancel);
     };
   }, [camera, gl, scene]);
 
@@ -273,6 +368,21 @@ function snapToAxis(v: THREE.Vector3): THREE.Vector3 {
   if (ax >= ay && ax >= az) return new THREE.Vector3(Math.sign(v.x) || 1, 0, 0);
   if (ay >= az) return new THREE.Vector3(0, Math.sign(v.y) || 1, 0);
   return new THREE.Vector3(0, 0, Math.sign(v.z) || 1);
+}
+
+/**
+ * Snap a drag vector to its dominant in-plane axis, ignoring the component
+ * along `faceNormal`. Returns a unit axis-aligned vector in local space.
+ */
+function snapInPlane(
+  drag: THREE.Vector3,
+  faceNormal: THREE.Vector3,
+): THREE.Vector3 {
+  const projected = drag.clone();
+  if (Math.abs(faceNormal.x) > 0.5) projected.x = 0;
+  else if (Math.abs(faceNormal.y) > 0.5) projected.y = 0;
+  else projected.z = 0;
+  return snapToAxis(projected);
 }
 
 const worldUpQuat = new THREE.Quaternion();

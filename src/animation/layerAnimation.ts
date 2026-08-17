@@ -8,9 +8,9 @@ export interface RunningAnimation {
   move: Move;
   /** Cubie ids that participate in this turn — stable during animation. */
   cubieIds: Set<number>;
-  /** World-space axis of rotation. */
+  /** Cube-local axis of rotation (positive direction). */
   axis: THREE.Vector3;
-  /** Total signed radians to rotate (positive = CCW around axis in right-handed coords). */
+  /** Total signed radians to rotate about the axis (right-hand rule). */
   targetAngle: number;
   duration: number;
   elapsed: number;
@@ -20,17 +20,17 @@ export interface RunningAnimation {
 }
 
 /**
- * Given a move + the *current* cube state (pre-move), determine which world axis
- * to spin, by how much, and which cubies are affected. Also records base
- * transforms so the animator can compute per-frame positions/rotations without
- * any dependency on prior React renders.
+ * Which cubies participate in a layer turn, the axis to rotate about, and the
+ * pre-move transforms — shared by animated turns and live-drag turns. `axis`
+ * is unit-length and always points in the positive coordinate direction of
+ * the face's rotation axis; `targetAngle` carries the sign.
  */
-export function planLayerAnimation(
-  cubies: Cubie[],
-  move: Move,
-  duration: number,
-  onDone: () => void,
-): RunningAnimation {
+export function planLayerCubies(cubies: Cubie[], move: Move): {
+  cubieIds: Set<number>;
+  axis: THREE.Vector3;
+  baseTransforms: Map<number, { position: THREE.Vector3; quaternion: THREE.Quaternion }>;
+  targetAngle: number;
+} {
   const def = FACE_DEFS[move.face];
   const axisVec = new THREE.Vector3(
     def.axis === 'x' ? 1 : 0,
@@ -55,18 +55,36 @@ export function planLayerAnimation(
       quaternion: mat3ToQuaternion(c.rotation),
     });
   }
-  const quarterTurns =
-    (move.turns === 2 ? 2 : move.turns) * def.baseTurns;
-  const targetAngle = quarterTurns * (Math.PI / 2);
-
+  const quarterTurns = (move.turns === 2 ? 2 : move.turns) * def.baseTurns;
   return {
-    move,
     cubieIds,
     axis: axisVec,
-    targetAngle,
+    baseTransforms,
+    targetAngle: quarterTurns * (Math.PI / 2),
+  };
+}
+
+/**
+ * Given a move + the *current* cube state (pre-move), determine which world axis
+ * to spin, by how much, and which cubies are affected. Also records base
+ * transforms so the animator can compute per-frame positions/rotations without
+ * any dependency on prior React renders.
+ */
+export function planLayerAnimation(
+  cubies: Cubie[],
+  move: Move,
+  duration: number,
+  onDone: () => void,
+): RunningAnimation {
+  const plan = planLayerCubies(cubies, move);
+  return {
+    move,
+    cubieIds: plan.cubieIds,
+    axis: plan.axis,
+    targetAngle: plan.targetAngle,
     duration,
     elapsed: 0,
-    baseTransforms,
+    baseTransforms: plan.baseTransforms,
     onDone,
   };
 }

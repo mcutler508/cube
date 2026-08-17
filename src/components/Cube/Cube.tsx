@@ -7,6 +7,7 @@ import {
   planLayerAnimation,
   type RunningAnimation,
 } from '../../animation/layerAnimation';
+import { dragController, type ActiveDrag } from '../../animation/dragController';
 import { mat3ToQuaternion } from '../../animation/orientation';
 import { CUBIE_SPACING } from '../../cube/geometry';
 import { useGameStore } from '../../store/gameStore';
@@ -23,6 +24,8 @@ export function Cube() {
   const cubeStateRef = useRef(useGameStore.getState().cubeState);
   const groupRefs = useRef<Map<number, THREE.Group>>(new Map());
   const animationRef = useRef<RunningAnimation | null>(null);
+  /** Cubie ids owned by the most recent drag — re-baked when the drag clears. */
+  const lastDragCubieIdsRef = useRef<Set<number> | null>(null);
 
   // Keep a live ref to the current cube state so we can plan animations at
   // the exact moment a move is popped from the queue, not from stale render
@@ -36,10 +39,13 @@ export function Cube() {
 
   // When state changes and no animation is running, snap each cubie group to
   // the state-derived transform. This is the "bake" step after an animation
-  // completes, and also covers Reset / initial mount.
+  // completes, and also covers Reset / initial mount. Skip while a drag owns
+  // the affected cubies — the drag tick will re-render them.
   useEffect(() => {
     if (animationRef.current) return;
+    const drag = dragController.get();
     for (const c of cubies) {
+      if (drag && drag.cubieIds.has(c.id)) continue;
       const group = groupRefs.current.get(c.id);
       if (!group) continue;
       applyState(group, c);
@@ -47,7 +53,7 @@ export function Cube() {
   }, [cubies]);
 
   useFrame((_, delta) => {
-    tick(delta, groupRefs, animationRef);
+    tick(delta, groupRefs, animationRef, lastDragCubieIdsRef);
   });
 
   const visibleCubies = useMemo(
@@ -100,7 +106,33 @@ function tick(
   delta: number,
   groupRefs: React.MutableRefObject<Map<number, THREE.Group>>,
   animationRef: React.MutableRefObject<RunningAnimation | null>,
+  lastDragCubieIdsRef: React.MutableRefObject<Set<number> | null>,
 ) {
+  // Live-drag / snap-back path takes precedence over queued animations.
+  // Queue is gated behind moveQueue.isBusy() (which the drag controller flips
+  // while it owns cubies), so the two paths never render the same cubie in a
+  // given frame.
+  const drag = dragController.get();
+  if (drag) {
+    renderDrag(drag, groupRefs);
+    lastDragCubieIdsRef.current = drag.cubieIds;
+    dragController.tick(delta);
+    return;
+  }
+
+  // Drag just cleared. Re-bake affected cubies from state so we recover
+  // cleanly whether commitPlayerMove ran (state changed, transforms match) or
+  // was rejected (no-op, cubies need to snap back visually).
+  if (lastDragCubieIdsRef.current) {
+    const state = useGameStore.getState().cubeState;
+    for (const c of state.cubies) {
+      if (!lastDragCubieIdsRef.current.has(c.id)) continue;
+      const group = groupRefs.current.get(c.id);
+      if (group) applyState(group, c);
+    }
+    lastDragCubieIdsRef.current = null;
+  }
+
   let anim = animationRef.current;
   if (!anim) {
     anim = startNext(groupRefs, animationRef);
@@ -137,6 +169,28 @@ function tick(
     animationRef.current = null;
     moveQueue.setBusy(false);
     startNext(groupRefs, animationRef);
+  }
+}
+
+function renderDrag(
+  drag: ActiveDrag,
+  groupRefs: React.MutableRefObject<Map<number, THREE.Group>>,
+) {
+  const angle =
+    drag.kind === 'live'
+      ? drag.angle
+      : drag.startAngle +
+        (drag.targetAngle - drag.startAngle) *
+          easeInOutCubic(Math.min(drag.elapsed / drag.duration, 1));
+  for (const id of drag.cubieIds) {
+    const group = groupRefs.current.get(id);
+    if (!group) continue;
+    const base = drag.baseTransforms.get(id);
+    if (!base) continue;
+    tmpVec.copy(base.position).applyAxisAngle(drag.axis, angle);
+    group.position.copy(tmpVec);
+    tmpQuat.setFromAxisAngle(drag.axis, angle);
+    group.quaternion.copy(tmpQuat).multiply(base.quaternion);
   }
 }
 
