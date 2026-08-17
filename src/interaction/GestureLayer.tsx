@@ -1,0 +1,305 @@
+import { useThree } from '@react-three/fiber';
+import { useEffect, useRef, type ReactNode } from 'react';
+import * as THREE from 'three';
+import { enqueuePlayerMove } from '../animation/enqueue';
+import { moveQueue } from '../animation/moveController';
+import { useGameStore } from '../store/gameStore';
+import {
+  findCubieAncestor,
+  normalToWorld,
+  raycastToPlane,
+} from './raycastHelpers';
+import { resolveLayerTurn } from './gestureResolver';
+
+const LAYER_COMMIT_THRESHOLD_PX = 10;
+const ORBIT_SENSITIVITY = 0.007; // radians per pixel
+
+type GestureState =
+  | { kind: 'idle' }
+  | {
+      kind: 'possible-layer-turn';
+      pointerId: number;
+      startX: number;
+      startY: number;
+      cubieId: number;
+      /** Face normal in cube-local (root group's local) space, axis-aligned. */
+      faceNormalLocal: THREE.Vector3;
+      /** Face normal in world space. */
+      faceNormalWorld: THREE.Vector3;
+      /** Hit point on the face in world space. */
+      hitWorld: THREE.Vector3;
+    }
+  | {
+      kind: 'orbiting';
+      pointerId: number;
+      lastX: number;
+      lastY: number;
+    }
+  | {
+      kind: 'two-finger-orbit';
+      pointerIds: [number, number];
+      lastX: number;
+      lastY: number;
+    };
+
+/**
+ * Wraps the cube in a group whose rotation the user can spin (orbit). Handles
+ * pointer events directly on the canvas so we can precisely arbitrate between
+ * "orbit" and "turn a layer" without fighting with r3f's built-in event system.
+ */
+export function GestureLayer({ children }: { children: ReactNode }) {
+  const rootRef = useRef<THREE.Group>(null!);
+  const { camera, gl, scene } = useThree();
+  const stateRef = useRef<GestureState>({ kind: 'idle' });
+  const raycasterRef = useRef(new THREE.Raycaster());
+  const planeRef = useRef(new THREE.Plane());
+  const activeTouches = useRef<Map<number, { x: number; y: number }>>(new Map());
+
+  useEffect(() => {
+    const canvas = gl.domElement;
+
+    const toNDC = (e: PointerEvent, out: THREE.Vector2) => {
+      const rect = canvas.getBoundingClientRect();
+      out.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      out.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      return out;
+    };
+
+    const ndc = new THREE.Vector2();
+    const tmpVec = new THREE.Vector3();
+    const tmpVec2 = new THREE.Vector3();
+    const tmpQuat = new THREE.Quaternion();
+
+    const raycastCube = (e: PointerEvent) => {
+      if (!rootRef.current) return null;
+      toNDC(e, ndc);
+      raycasterRef.current.setFromCamera(ndc, camera);
+      const hits = raycasterRef.current.intersectObject(rootRef.current, true);
+      for (const hit of hits) {
+        const ancestor = findCubieAncestor(hit.object);
+        if (ancestor && hit.face) {
+          return { hit, ancestor };
+        }
+      }
+      return null;
+    };
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (moveQueue.isBusy()) return; // ignore inputs during animation
+      activeTouches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      // Two-finger touch → orbit with the pair.
+      if (activeTouches.current.size === 2 && e.pointerType === 'touch') {
+        const [a, b] = Array.from(activeTouches.current.entries());
+        stateRef.current = {
+          kind: 'two-finger-orbit',
+          pointerIds: [a[0], b[0]],
+          lastX: (a[1].x + b[1].x) / 2,
+          lastY: (a[1].y + b[1].y) / 2,
+        };
+        return;
+      }
+      if (activeTouches.current.size > 1) return;
+
+      const cubeHit = raycastCube(e);
+      if (cubeHit) {
+        // Compute world-space face normal from mesh-local face normal.
+        const meshWorldNormal = normalToWorld(
+          cubeHit.hit.object,
+          cubeHit.hit.face!.normal.clone(),
+          new THREE.Vector3(),
+        );
+        // Convert to cube-local (root group) frame.
+        rootRef.current!.getWorldQuaternion(tmpQuat).invert();
+        const localNormal = meshWorldNormal.clone().applyQuaternion(tmpQuat).normalize();
+        // Snap to nearest axis for numerical safety.
+        const snapped = snapToAxis(localNormal);
+
+        stateRef.current = {
+          kind: 'possible-layer-turn',
+          pointerId: e.pointerId,
+          startX: e.clientX,
+          startY: e.clientY,
+          cubieId: cubeHit.ancestor.cubieId,
+          faceNormalLocal: snapped,
+          faceNormalWorld: meshWorldNormal,
+          hitWorld: cubeHit.hit.point.clone(),
+        };
+        canvas.setPointerCapture(e.pointerId);
+      } else {
+        stateRef.current = {
+          kind: 'orbiting',
+          pointerId: e.pointerId,
+          lastX: e.clientX,
+          lastY: e.clientY,
+        };
+        canvas.setPointerCapture(e.pointerId);
+      }
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      const s = stateRef.current;
+      if (activeTouches.current.has(e.pointerId)) {
+        activeTouches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      }
+
+      if (s.kind === 'two-finger-orbit') {
+        // Use midpoint of the two tracked touches.
+        const pts = s.pointerIds
+          .map((id) => activeTouches.current.get(id))
+          .filter(Boolean) as { x: number; y: number }[];
+        if (pts.length < 2) return;
+        const cx = (pts[0].x + pts[1].x) / 2;
+        const cy = (pts[0].y + pts[1].y) / 2;
+        applyOrbit(rootRef, cx - s.lastX, cy - s.lastY);
+        s.lastX = cx;
+        s.lastY = cy;
+        return;
+      }
+
+      if (s.kind === 'orbiting' && e.pointerId === s.pointerId) {
+        applyOrbit(rootRef, e.clientX - s.lastX, e.clientY - s.lastY);
+        s.lastX = e.clientX;
+        s.lastY = e.clientY;
+        return;
+      }
+
+      if (s.kind === 'possible-layer-turn' && e.pointerId === s.pointerId) {
+        const dx = e.clientX - s.startX;
+        const dy = e.clientY - s.startY;
+        const dist2 = dx * dx + dy * dy;
+        if (dist2 < LAYER_COMMIT_THRESHOLD_PX * LAYER_COMMIT_THRESHOLD_PX) return;
+
+        // Project the current pointer position onto the touched face plane in world space.
+        toNDC(e, ndc);
+        const hit = raycastToPlane(
+          ndc,
+          camera,
+          s.hitWorld,
+          s.faceNormalWorld,
+          raycasterRef.current,
+          planeRef.current,
+          tmpVec,
+        );
+        if (!hit) {
+          // Ray parallel to face — fall back to orbit.
+          stateRef.current = {
+            kind: 'orbiting',
+            pointerId: e.pointerId,
+            lastX: e.clientX,
+            lastY: e.clientY,
+          };
+          return;
+        }
+        // World-space drag vector on the face plane.
+        const worldDrag = tmpVec2.copy(hit).sub(s.hitWorld);
+        // Convert to cube-local frame.
+        rootRef.current!.getWorldQuaternion(tmpQuat).invert();
+        const localDrag = worldDrag.applyQuaternion(tmpQuat);
+
+        // Look up the touched cubie's current logical position.
+        const cubie = useGameStore.getState().cubeState.cubies.find(
+          (c) => c.id === s.cubieId,
+        );
+        if (!cubie) {
+          stateRef.current = { kind: 'idle' };
+          return;
+        }
+        const move = resolveLayerTurn(s.faceNormalLocal, localDrag, cubie.position);
+        if (move) {
+          enqueuePlayerMove(move);
+        }
+        stateRef.current = { kind: 'idle' };
+        return;
+      }
+    };
+
+    const endPointer = (e: PointerEvent) => {
+      activeTouches.current.delete(e.pointerId);
+      const s = stateRef.current;
+      if (s.kind === 'two-finger-orbit') {
+        if (activeTouches.current.size < 2) {
+          // Fall back to single-pointer state if any remains.
+          const remaining = Array.from(activeTouches.current.entries())[0];
+          if (remaining) {
+            stateRef.current = {
+              kind: 'orbiting',
+              pointerId: remaining[0],
+              lastX: remaining[1].x,
+              lastY: remaining[1].y,
+            };
+          } else {
+            stateRef.current = { kind: 'idle' };
+          }
+        }
+      } else if (
+        (s.kind === 'orbiting' || s.kind === 'possible-layer-turn') &&
+        s.pointerId === e.pointerId
+      ) {
+        stateRef.current = { kind: 'idle' };
+      }
+      try {
+        if (canvas.hasPointerCapture(e.pointerId)) {
+          canvas.releasePointerCapture(e.pointerId);
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+
+    // pointermove/up are on window so we still receive them if the pointer
+    // strays off the canvas mid-drag (pointer capture also helps but window
+    // listeners are a belt-and-suspenders fallback for some browsers).
+    canvas.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', endPointer);
+    window.addEventListener('pointercancel', endPointer);
+
+    return () => {
+      canvas.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', endPointer);
+      window.removeEventListener('pointercancel', endPointer);
+    };
+  }, [camera, gl, scene]);
+
+  return <group ref={rootRef}>{children}</group>;
+}
+
+function snapToAxis(v: THREE.Vector3): THREE.Vector3 {
+  const ax = Math.abs(v.x);
+  const ay = Math.abs(v.y);
+  const az = Math.abs(v.z);
+  if (ax >= ay && ax >= az) return new THREE.Vector3(Math.sign(v.x) || 1, 0, 0);
+  if (ay >= az) return new THREE.Vector3(0, Math.sign(v.y) || 1, 0);
+  return new THREE.Vector3(0, 0, Math.sign(v.z) || 1);
+}
+
+const worldUpQuat = new THREE.Quaternion();
+const worldRightQuat = new THREE.Quaternion();
+const composedQuat = new THREE.Quaternion();
+
+/**
+ * Trackball-style orbit: rotate the cube around the world-Y axis based on
+ * horizontal drag, and around the world-X axis based on vertical drag. We
+ * apply the delta in *world* space by pre-multiplying it onto the group's
+ * existing rotation — that keeps the axes intuitive regardless of the cube's
+ * current orientation.
+ */
+function applyOrbit(
+  rootRef: React.RefObject<THREE.Group | null>,
+  dx: number,
+  dy: number,
+) {
+  if (!rootRef.current) return;
+  const yaw = dx * ORBIT_SENSITIVITY;
+  const pitch = dy * ORBIT_SENSITIVITY;
+  if (yaw === 0 && pitch === 0) return;
+  worldUpQuat.setFromAxisAngle(WORLD_Y, yaw);
+  worldRightQuat.setFromAxisAngle(WORLD_X, pitch);
+  composedQuat.copy(worldUpQuat).multiply(worldRightQuat);
+  rootRef.current.quaternion.premultiply(composedQuat);
+}
+
+const WORLD_X = new THREE.Vector3(1, 0, 0);
+const WORLD_Y = new THREE.Vector3(0, 1, 0);
