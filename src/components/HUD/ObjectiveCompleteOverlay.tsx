@@ -1,19 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { describeObjective } from '../../game/levels/labels';
-import {
-  exitToMenu,
-  loadLevel,
-  restartCurrentLevel,
-} from '../../game/levels/loader';
-import { nextLevel } from '../../game/levels/catalog';
-import { formatElapsed } from './useLiveTimer';
+import { LevelResultPanel } from './LevelResultPanel';
 
 /**
  * Non-full-solve objective completion overlay. Renders when the player has
  * satisfied the level objective (e.g. completed the white face) but the cube
- * itself isn't fully solved. Full-solve objectives are handled by the existing
- * SolvedSequence — this overlay stays out of the way to avoid double-celebration.
+ * itself isn't fully solved. Full-solve objectives are handled by the
+ * existing SolvedSequence — this overlay stays out of the way to avoid
+ * double-celebration.
  */
 export function ObjectiveCompleteOverlay() {
   const level = useGameStore((s) => s.currentLevel);
@@ -22,22 +17,25 @@ export function ObjectiveCompleteOverlay() {
   const moves = useGameStore((s) => s.moveCount);
   const startedAt = useGameStore((s) => s.startedAt);
 
-  const [stage, setStage] = useState<0 | 1>(0);
+  const [snapshot, setSnapshot] = useState<{ moves: number; elapsedMs: number } | null>(null);
   const shouldShow = objectiveCompleted && phase !== 'solved' && level != null;
 
   useEffect(() => {
     if (!shouldShow) {
-      setStage(0);
+      setSnapshot(null);
       return;
     }
-    const t = window.setTimeout(() => setStage(1), 320);
-    return () => window.clearTimeout(t);
+    // Snapshot the completion once so the timer freezes as the overlay opens.
+    setSnapshot({
+      moves,
+      elapsedMs: startedAt != null ? performance.now() - startedAt : 0,
+    });
+    // Intentionally exclude `moves`/`startedAt` — we only snapshot on the
+    // rising edge of `shouldShow` and hold that value until the overlay closes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shouldShow]);
 
-  if (!shouldShow || !level) return null;
-
-  const elapsedMs = startedAt != null ? performance.now() - startedAt : 0;
-  const next = nextLevel(level.id);
+  if (!shouldShow || !level || !snapshot) return null;
 
   return (
     <div className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center">
@@ -62,30 +60,11 @@ export function ObjectiveCompleteOverlay() {
           {describeObjective(level.objective)}
         </div>
 
-        {stage >= 1 && (
-          <div
-            className="mt-5 grid w-full grid-cols-2 gap-2 text-center"
-            style={{ animation: 'popup 320ms ease-out' }}
-          >
-            <StatCard label="Moves" value={String(moves)} />
-            <StatCard label="Time" value={formatElapsed(elapsedMs)} />
-          </div>
-        )}
-
-        {stage >= 1 && (
-          <div
-            className="mt-5 flex flex-wrap items-center justify-center gap-2"
-            style={{ animation: 'popup 400ms ease-out' }}
-          >
-            <OverlayButton onClick={() => exitToMenu()}>Menu</OverlayButton>
-            <OverlayButton onClick={() => restartCurrentLevel()}>Replay</OverlayButton>
-            {next && (
-              <OverlayButton primary onClick={() => loadLevel(next)}>
-                Next
-              </OverlayButton>
-            )}
-          </div>
-        )}
+        <LevelResultPanel
+          level={level}
+          moves={snapshot.moves}
+          elapsedMs={snapshot.elapsedMs}
+        />
       </div>
       <style>{`
         @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
@@ -95,35 +74,5 @@ export function ObjectiveCompleteOverlay() {
         }
       `}</style>
     </div>
-  );
-}
-
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl bg-white/[0.06] px-3 py-2.5 ring-1 ring-white/10">
-      <div className="text-[9px] uppercase tracking-[0.22em] text-white/45">{label}</div>
-      <div className="mt-0.5 font-mono text-lg tabular-nums text-white">{value}</div>
-    </div>
-  );
-}
-
-function OverlayButton({
-  children,
-  onClick,
-  primary,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  primary?: boolean;
-}) {
-  const base =
-    'min-w-[86px] rounded-full px-5 py-2.5 text-sm font-medium tracking-wide transition-all active:scale-95';
-  const style = primary
-    ? 'bg-white text-black shadow-lg shadow-black/40 hover:bg-white/95'
-    : 'bg-white/[0.08] text-white/85 ring-1 ring-white/10 hover:bg-white/15';
-  return (
-    <button type="button" onClick={onClick} className={`${base} ${style}`}>
-      {children}
-    </button>
   );
 }

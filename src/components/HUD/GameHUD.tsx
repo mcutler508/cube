@@ -89,17 +89,23 @@ function BottomBarSlot() {
   const hasHistory = useGameStore((s) => s.history.length > 0);
   const phase = useGameStore((s) => s.phase);
   const objectiveCompleted = useGameStore((s) => s.objectiveCompleted);
+  const hintPending = useGameStore((s) => s.hintPending);
+  const requestHint = useGameStore((s) => s.requestHint);
   const { busy, onUndo, onRestart, onMenu } = useGameControls();
   const canUndo = hasHistory && phase !== 'solved' && !objectiveCompleted;
+  const canHint = phase !== 'solved' && !objectiveCompleted && !hintPending;
 
   return (
     <div className="mt-3 flex justify-center">
-      <div className="flex items-center gap-2 rounded-full bg-white/5 p-1.5 ring-1 ring-white/10">
+      <div className="flex items-center gap-1.5 rounded-full bg-white/5 p-1.5 ring-1 ring-white/10">
         <HudButton onClick={onMenu} disabled={busy}>
           Menu
         </HudButton>
         <HudButton onClick={onUndo} disabled={!canUndo || busy}>
           Undo
+        </HudButton>
+        <HudButton onClick={() => requestHint()} disabled={!canHint || busy}>
+          {hintPending ? 'Hint…' : 'Hint'}
         </HudButton>
         <HudButton onClick={onRestart} primary disabled={busy}>
           Restart
@@ -112,9 +118,7 @@ function BottomBarSlot() {
 function SolvedOverlaySlot() {
   const phase = useGameStore((s) => s.phase);
   if (phase !== 'solved') return null;
-  // Level-mode overlays route to the level actions inside SolvedSequence; the
-  // difficulty-based onAgain is a no-op fallback for the pre-levels codepath.
-  return <SolvedSequence onAgain={() => {}} />;
+  return <SolvedSequence />;
 }
 
 function HudButton({
@@ -129,7 +133,7 @@ function HudButton({
   primary?: boolean;
 }) {
   const base =
-    'min-w-[92px] rounded-full px-5 py-3 text-sm font-medium tracking-wide transition-all active:scale-95';
+    'min-w-[76px] rounded-full px-4 py-3 text-sm font-medium tracking-wide transition-all active:scale-95';
   const style = primary
     ? 'bg-white text-black shadow-lg shadow-black/40 hover:bg-white/95 disabled:bg-white/40 disabled:text-black/60'
     : 'bg-white/[0.08] text-white/85 hover:bg-white/15 disabled:opacity-40';

@@ -9,37 +9,76 @@ import { useGameEvent } from '../../animation/triggers';
  * cube's back sides are hidden.
  *
  * The net doubles as a tactical display:
- *   - solved faces glow subtly to reward completion.
- *   - a fresh face-complete event triggers a brief pulse on that face.
- *   - a face-broken event triggers a quieter dim pulse (not punishing).
+ *   - Solved faces glow subtly for the duration they stay solved.
+ *   - Face / cross / row / layer completions each trigger a distinct pulse:
+ *     small strip for a row, "+" for a cross, full face for a face, face + bands
+ *     for a layer. Broken events get a quieter dim pulse (not punishing).
  */
+type FaceFlash = { face: FaceLetter; kind: 'completed' | 'broken'; key: number };
+type RowFlash = { face: FaceLetter; row: 0 | 1 | 2; key: number };
+type CrossFlash = { face: FaceLetter; key: number };
+type LayerFlash = { face: FaceLetter; key: number };
+
+const FLASH_MS = 700;
+
 export function CubeNet() {
   const cubies = useGameStore((s) => s.cubeState.cubies);
   const solved = useGameStore((s) => s.solvedFaces);
   const net = useMemo(() => computeNet({ cubies }), [cubies]);
 
-  // Track "just changed" face events so we can flash the corresponding face.
-  const [flashFace, setFlashFace] = useState<{
-    face: FaceLetter;
-    kind: 'completed' | 'broken';
-    key: number;
-  } | null>(null);
+  const [faceFlash, setFaceFlash] = useState<FaceFlash | null>(null);
+  const [rowFlash, setRowFlash] = useState<RowFlash | null>(null);
+  const [crossFlash, setCrossFlash] = useState<CrossFlash | null>(null);
+  const [layerFlash, setLayerFlash] = useState<LayerFlash | null>(null);
+
   useGameEvent('faceCompleted', (e) => {
-    setFlashFace({ face: e.face, kind: 'completed', key: performance.now() });
+    setFaceFlash({ face: e.face, kind: 'completed', key: performance.now() });
   });
   useGameEvent('faceBroken', (e) => {
-    setFlashFace({ face: e.face, kind: 'broken', key: performance.now() });
+    setFaceFlash({ face: e.face, kind: 'broken', key: performance.now() });
   });
+  useGameEvent('rowCompleted', (e) => {
+    setRowFlash({ face: e.face, row: e.row, key: performance.now() });
+  });
+  useGameEvent('crossCompleted', (e) => {
+    setCrossFlash({ face: e.face, key: performance.now() });
+  });
+  useGameEvent('layerCompleted', (e) => {
+    setLayerFlash({ face: e.face, key: performance.now() });
+  });
+
   useEffect(() => {
-    if (!flashFace) return;
-    const t = window.setTimeout(() => setFlashFace(null), 700);
+    if (!faceFlash) return;
+    const t = window.setTimeout(() => setFaceFlash(null), FLASH_MS);
     return () => window.clearTimeout(t);
-  }, [flashFace]);
+  }, [faceFlash]);
+  useEffect(() => {
+    if (!rowFlash) return;
+    const t = window.setTimeout(() => setRowFlash(null), FLASH_MS);
+    return () => window.clearTimeout(t);
+  }, [rowFlash]);
+  useEffect(() => {
+    if (!crossFlash) return;
+    const t = window.setTimeout(() => setCrossFlash(null), FLASH_MS);
+    return () => window.clearTimeout(t);
+  }, [crossFlash]);
+  useEffect(() => {
+    if (!layerFlash) return;
+    const t = window.setTimeout(() => setLayerFlash(null), FLASH_MS + 100);
+    return () => window.clearTimeout(t);
+  }, [layerFlash]);
 
   return (
     <div className="pointer-events-none flex items-center justify-center">
       <div className="pointer-events-auto flex items-center gap-3 rounded-2xl bg-black/40 px-3 py-3 backdrop-blur-xl ring-1 ring-white/10">
-        <NetSvg net={net} solvedFaces={solved} flashFace={flashFace} />
+        <NetSvg
+          net={net}
+          solvedFaces={solved}
+          faceFlash={faceFlash}
+          rowFlash={rowFlash}
+          crossFlash={crossFlash}
+          layerFlash={layerFlash}
+        />
       </div>
     </div>
   );
@@ -54,14 +93,72 @@ const FACE_LABEL: Record<FaceLetter, string> = {
   B: 'B',
 };
 
+/**
+ * For each face, the (face, cell) pairs on adjacent faces that light up on a
+ * layerCompleted flash. Mirrors the LAYER_ADJACENT_BANDS table in detections.ts
+ * (kept local to avoid pulling detection helpers into a rendering module).
+ */
+const LAYER_BANDS: Record<FaceLetter, Array<{ face: FaceLetter; cells: Array<[0 | 1 | 2, 0 | 1 | 2]> }>> = {
+  U: [
+    { face: 'F', cells: [[0, 0], [0, 1], [0, 2]] },
+    { face: 'B', cells: [[0, 0], [0, 1], [0, 2]] },
+    { face: 'L', cells: [[0, 0], [0, 1], [0, 2]] },
+    { face: 'R', cells: [[0, 0], [0, 1], [0, 2]] },
+  ],
+  D: [
+    { face: 'F', cells: [[2, 0], [2, 1], [2, 2]] },
+    { face: 'B', cells: [[2, 0], [2, 1], [2, 2]] },
+    { face: 'L', cells: [[2, 0], [2, 1], [2, 2]] },
+    { face: 'R', cells: [[2, 0], [2, 1], [2, 2]] },
+  ],
+  F: [
+    { face: 'U', cells: [[2, 0], [2, 1], [2, 2]] },
+    { face: 'D', cells: [[0, 0], [0, 1], [0, 2]] },
+    { face: 'L', cells: [[0, 2], [1, 2], [2, 2]] },
+    { face: 'R', cells: [[0, 0], [1, 0], [2, 0]] },
+  ],
+  B: [
+    { face: 'U', cells: [[0, 0], [0, 1], [0, 2]] },
+    { face: 'D', cells: [[2, 0], [2, 1], [2, 2]] },
+    { face: 'L', cells: [[0, 0], [1, 0], [2, 0]] },
+    { face: 'R', cells: [[0, 2], [1, 2], [2, 2]] },
+  ],
+  L: [
+    { face: 'U', cells: [[0, 0], [1, 0], [2, 0]] },
+    { face: 'D', cells: [[0, 0], [1, 0], [2, 0]] },
+    { face: 'F', cells: [[0, 0], [1, 0], [2, 0]] },
+    { face: 'B', cells: [[0, 2], [1, 2], [2, 2]] },
+  ],
+  R: [
+    { face: 'U', cells: [[0, 2], [1, 2], [2, 2]] },
+    { face: 'D', cells: [[0, 2], [1, 2], [2, 2]] },
+    { face: 'F', cells: [[0, 2], [1, 2], [2, 2]] },
+    { face: 'B', cells: [[0, 0], [1, 0], [2, 0]] },
+  ],
+};
+
+const CROSS_CELLS: Array<[0 | 1 | 2, 0 | 1 | 2]> = [
+  [0, 1],
+  [1, 0],
+  [1, 1],
+  [1, 2],
+  [2, 1],
+];
+
 function NetSvg({
   net,
   solvedFaces,
-  flashFace,
+  faceFlash,
+  rowFlash,
+  crossFlash,
+  layerFlash,
 }: {
   net: ReturnType<typeof computeNet>;
   solvedFaces: FaceLetter[];
-  flashFace: { face: FaceLetter; kind: 'completed' | 'broken'; key: number } | null;
+  faceFlash: FaceFlash | null;
+  rowFlash: RowFlash | null;
+  crossFlash: CrossFlash | null;
+  layerFlash: LayerFlash | null;
 }) {
   const CELL = 12;
   const GAP = 1.4;
@@ -80,6 +177,21 @@ function NetSvg({
   const height = (faceSize + FACE_GAP) * 3 - FACE_GAP;
   const solvedSet = new Set(solvedFaces);
 
+  // Build per-face highlight cell sets: layer flashes contribute cells on
+  // adjacent faces, so a single layerCompleted event lights up 5 faces.
+  const layerHighlights = new Map<FaceLetter, Array<[0 | 1 | 2, 0 | 1 | 2]>>();
+  if (layerFlash) {
+    // Own face — all 9 cells
+    layerHighlights.set(layerFlash.face, [
+      [0, 0], [0, 1], [0, 2],
+      [1, 0], [1, 1], [1, 2],
+      [2, 0], [2, 1], [2, 2],
+    ]);
+    for (const band of LAYER_BANDS[layerFlash.face]) {
+      layerHighlights.set(band.face, band.cells);
+    }
+  }
+
   return (
     <svg
       viewBox={`0 0 ${width} ${height}`}
@@ -97,7 +209,11 @@ function NetSvg({
           gap={GAP}
           grid={net[face]}
           solved={solvedSet.has(face)}
-          flash={flashFace?.face === face ? flashFace : null}
+          faceFlash={faceFlash?.face === face ? faceFlash : null}
+          rowFlash={rowFlash?.face === face ? rowFlash : null}
+          crossFlash={crossFlash?.face === face ? crossFlash : null}
+          layerCells={layerHighlights.get(face) ?? null}
+          layerKey={layerFlash?.key ?? null}
         />
       ))}
       <style>{`
@@ -109,6 +225,16 @@ function NetSvg({
         @keyframes netBrokenPulse {
           0% { opacity: 0.7; }
           100% { opacity: 0; }
+        }
+        @keyframes netCellPulse {
+          0% { opacity: 0; }
+          30% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+        @keyframes netStripPulse {
+          0% { opacity: 0; transform: scale(0.98); }
+          35% { opacity: 1; transform: scale(1.02); }
+          100% { opacity: 0; transform: scale(1.06); }
         }
       `}</style>
     </svg>
@@ -124,7 +250,11 @@ function Face({
   gap,
   grid,
   solved,
-  flash,
+  faceFlash,
+  rowFlash,
+  crossFlash,
+  layerCells,
+  layerKey,
 }: {
   label: string;
   x: number;
@@ -134,10 +264,21 @@ function Face({
   gap: number;
   grid: string[][];
   solved: boolean;
-  flash: { face: FaceLetter; kind: 'completed' | 'broken'; key: number } | null;
+  faceFlash: FaceFlash | null;
+  rowFlash: RowFlash | null;
+  crossFlash: CrossFlash | null;
+  layerCells: Array<[0 | 1 | 2, 0 | 1 | 2]> | null;
+  layerKey: number | null;
 }) {
   const solvedGlow = solved ? 'rgba(160, 240, 190, 0.55)' : 'rgba(255,255,255,0.08)';
   const strokeWidth = solved ? 1.1 : 0.6;
+
+  const cellRect = (r: 0 | 1 | 2, c: 0 | 1 | 2) => ({
+    x: c * (cell + gap),
+    y: r * (cell + gap),
+    width: cell,
+    height: cell,
+  });
 
   return (
     <g transform={`translate(${x} ${y})`}>
@@ -179,9 +320,83 @@ function Face({
           />
         )),
       )}
-      {flash && flash.kind === 'completed' && (
+
+      {/* Row flash: highlight the 3 cells of that row. */}
+      {rowFlash && (
+        <g
+          key={`row-${rowFlash.key}`}
+          style={{
+            transformOrigin: `${size / 2}px ${size / 2}px`,
+            animation: 'netStripPulse 520ms ease-out forwards',
+          }}
+        >
+          {[0, 1, 2].map((c) => {
+            const rect = cellRect(rowFlash.row, c as 0 | 1 | 2);
+            return (
+              <rect
+                key={c}
+                {...rect}
+                rx={1.6}
+                fill="none"
+                stroke="rgba(255,255,255,0.95)"
+                strokeWidth={1.2}
+                style={{ filter: 'drop-shadow(0 0 2px rgba(255,255,255,0.9))' }}
+              />
+            );
+          })}
+        </g>
+      )}
+
+      {/* Cross flash: outline the "+" cells. */}
+      {crossFlash && (
+        <g
+          key={`cross-${crossFlash.key}`}
+          style={{
+            transformOrigin: `${size / 2}px ${size / 2}px`,
+            animation: 'netStripPulse 600ms ease-out forwards',
+          }}
+        >
+          {CROSS_CELLS.map(([r, c], i) => {
+            const rect = cellRect(r, c);
+            return (
+              <rect
+                key={i}
+                {...rect}
+                rx={1.6}
+                fill="none"
+                stroke="rgba(180, 240, 255, 0.95)"
+                strokeWidth={1.3}
+                style={{ filter: 'drop-shadow(0 0 2.5px rgba(180, 240, 255, 0.9))' }}
+              />
+            );
+          })}
+        </g>
+      )}
+
+      {/* Layer flash: brighten own cells + adjacent-band cells. */}
+      {layerCells && layerKey !== null && (
+        <g
+          key={`layer-${layerKey}`}
+          style={{ animation: 'netCellPulse 720ms ease-out forwards' }}
+        >
+          {layerCells.map(([r, c], i) => {
+            const rect = cellRect(r, c);
+            return (
+              <rect
+                key={i}
+                {...rect}
+                rx={1.6}
+                fill="rgba(255, 255, 255, 0.45)"
+              />
+            );
+          })}
+        </g>
+      )}
+
+      {/* Face flash: ring around the whole face. */}
+      {faceFlash && faceFlash.kind === 'completed' && (
         <rect
-          key={`flash-${flash.key}`}
+          key={`flash-${faceFlash.key}`}
           x={-1.2}
           y={-1.2}
           width={size + 2.4}
@@ -197,9 +412,9 @@ function Face({
           }}
         />
       )}
-      {flash && flash.kind === 'broken' && (
+      {faceFlash && faceFlash.kind === 'broken' && (
         <rect
-          key={`flash-${flash.key}`}
+          key={`flash-${faceFlash.key}`}
           x={-1.2}
           y={-1.2}
           width={size + 2.4}

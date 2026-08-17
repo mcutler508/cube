@@ -11,6 +11,7 @@ import { gameEvents } from '../game/events';
 import { evaluateObjective } from '../game/levels/evaluator';
 import type { Level } from '../game/levels/types';
 import { detectAll, rowKey, type RowRef } from '../game/detections';
+import { nextHintMove } from '../game/solver';
 
 export type GamePhase = 'ready' | 'playing' | 'solved';
 
@@ -40,8 +41,12 @@ interface GameStore {
   streak: number;
   bestStreak: number;
   isNearSolved: boolean;
-  /** Placeholder for helper-arrow plumbing; always null until a solver lands. */
+  /** Populated by requestHint(); cleared on any move or level transition. */
   hintMove: Move | null;
+  /** True while the solver is running so UI can show a spinner / disable button. */
+  hintPending: boolean;
+  /** True after a solver run failed to find a hint within the depth budget. */
+  hintUnavailable: boolean;
 
   // --- level / objective ---
   currentLevel: Level | null;
@@ -57,6 +62,8 @@ interface GameStore {
   setDifficulty: (d: Difficulty) => void;
   loadLevel: (level: Level) => void;
   exitToMenu: () => void;
+  requestHint: () => void;
+  clearHint: () => void;
 }
 
 const initialProgress = evaluateProgress(createSolvedCube());
@@ -81,6 +88,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   bestStreak: 0,
   isNearSolved: false,
   hintMove: null,
+  hintPending: false,
+  hintUnavailable: false,
   currentLevel: null,
   objectiveCompleted: false,
 
@@ -141,6 +150,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       bestStreak,
       isNearSolved: isNear,
       objectiveCompleted: objectiveHit ? true : s.objectiveCompleted,
+      hintMove: null,
+      hintUnavailable: false,
     });
 
     // Emit events after the state update so subscribers see the new values.
@@ -228,6 +239,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       // Don't emit progress-change events for undos — they'd confuse the juice.
       // If undoing lands the cube on solved, don't celebrate.
       phase: solved && s.phase === 'playing' ? 'ready' : s.phase,
+      hintMove: null,
+      hintUnavailable: false,
     });
   },
 
@@ -282,6 +295,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       bestStreak: 0,
       isNearSolved: false,
       hintMove: null,
+      hintPending: false,
+      hintUnavailable: false,
       objectiveCompleted: false,
     });
   },
@@ -289,8 +304,41 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setDifficulty: (d) => set({ difficulty: d }),
 
   loadLevel: (level) => {
-    set({ currentLevel: level, objectiveCompleted: false });
+    set({
+      currentLevel: level,
+      objectiveCompleted: false,
+      hintMove: null,
+      hintPending: false,
+      hintUnavailable: false,
+    });
   },
+
+  requestHint: () => {
+    const s = get();
+    if (!s.currentLevel) return;
+    if (s.phase === 'solved' || s.objectiveCompleted) return;
+    if (s.hintPending) return;
+    // Solver is synchronous but can take ~half a second on the hardest levels.
+    // Flip pending true first so the button greys out, then yield a tick so
+    // React actually paints the disabled state before we block the main
+    // thread. `setTimeout(0)` is cheap and does the trick.
+    set({ hintPending: true, hintUnavailable: false });
+    setTimeout(() => {
+      const cur = get();
+      if (!cur.currentLevel) {
+        set({ hintPending: false });
+        return;
+      }
+      const move = nextHintMove(cur.cubeState, cur.currentLevel.objective, { maxDepth: 6 });
+      set({
+        hintPending: false,
+        hintMove: move,
+        hintUnavailable: move === null,
+      });
+    }, 0);
+  },
+
+  clearHint: () => set({ hintMove: null, hintUnavailable: false }),
 
   exitToMenu: () => {
     const fresh = evaluateProgress(createSolvedCube());

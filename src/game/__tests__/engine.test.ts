@@ -120,12 +120,15 @@ describe('streak logic', () => {
     expect(updateStreak(9, -20)).toBe(0);
   });
 
-  it('streak labels only appear at 2+', () => {
+  it('streak labels only appear at 2+ and escalate by tier', () => {
     expect(streakLabel(0)).toBeNull();
     expect(streakLabel(1)).toBeNull();
-    expect(streakLabel(2)).toBe('x2 STREAK');
-    expect(streakLabel(5)).toBe('NICE');
-    expect(streakLabel(10)).toBe('GREAT FLOW');
+    expect(streakLabel(2)).toBe('COMBO x2');
+    expect(streakLabel(3)).toBe('COMBO x3');
+    expect(streakLabel(4)).toBe('ON FIRE');
+    expect(streakLabel(5)).toBe('ON FIRE x5');
+    expect(streakLabel(8)).toBe('UNSTOPPABLE');
+    expect(streakLabel(10)).toBe('UNSTOPPABLE x10');
   });
 });
 

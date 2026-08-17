@@ -5,6 +5,9 @@ import { gameEvents } from '../game/events';
  * Haptics hooks. Uses the standard Vibration API where available; silently
  * no-ops on desktop and iOS Safari (which doesn't expose it). The app must
  * remain fully playable without haptics — treat these as pure sugar.
+ *
+ * Patterns escalate roughly with the feedback-tier ladder in the PRD:
+ * move → row → cross → face → layer → objective → cube solve.
  */
 
 let enabled = true;
@@ -34,8 +37,20 @@ function handle(event: GameEvent) {
     case 'moveCompleted':
       pulse(6);
       break;
+    case 'rowCompleted':
+      pulse([6, 30, 8]);
+      break;
+    case 'crossCompleted':
+      pulse([10, 30, 14]);
+      break;
     case 'faceCompleted':
       pulse([8, 20, 12]);
+      break;
+    case 'layerCompleted':
+      pulse([12, 30, 18, 30, 14]);
+      break;
+    case 'objectiveCompleted':
+      pulse([14, 40, 20, 40, 20]);
       break;
     case 'cubeSolved':
       pulse([15, 40, 25, 40, 40]);
