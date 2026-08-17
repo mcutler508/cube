@@ -8,6 +8,8 @@ import { invertMove } from '../cube/notation';
 import { evaluateProgress } from '../game/progress';
 import { updateStreak } from '../game/streak';
 import { gameEvents } from '../game/events';
+import { evaluateObjective } from '../game/levels/evaluator';
+import type { Level } from '../game/levels/types';
 
 export type GamePhase = 'ready' | 'playing' | 'solved';
 
@@ -36,6 +38,10 @@ interface GameStore {
   /** Placeholder for helper-arrow plumbing; always null until a solver lands. */
   hintMove: Move | null;
 
+  // --- level / objective ---
+  currentLevel: Level | null;
+  objectiveCompleted: boolean;
+
   // --- reducers ---
   commitPlayerMove: (move: Move) => void;
   commitScrambleMove: (move: Move) => void;
@@ -44,6 +50,8 @@ interface GameStore {
   endScramble: () => void;
   reset: () => void;
   setDifficulty: (d: Difficulty) => void;
+  loadLevel: (level: Level) => void;
+  exitToMenu: () => void;
 }
 
 const initialProgress = evaluateProgress(createSolvedCube());
@@ -64,10 +72,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
   bestStreak: 0,
   isNearSolved: false,
   hintMove: null,
+  currentLevel: null,
+  objectiveCompleted: false,
 
   commitPlayerMove: (move) => {
     const s = get();
-    if (s.phase === 'solved') return;
+    if (s.phase === 'solved' || s.objectiveCompleted) return;
     const next = applyMove(s.cubeState, move);
     const newProgress = evaluateProgress(next);
     const solved = detectSolved(next);
@@ -87,6 +97,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
     for (const f of newProgress.solvedFaces) if (!before.has(f)) newlyCompleted.push(f);
     for (const f of s.solvedFaces) if (!after.has(f)) newlyBroken.push(f);
 
+    // Level-objective check. Only fires when playing a level and the objective
+    // wasn't already satisfied; full_solve objectives suppress the overlay to
+    // avoid double-celebration with SolvedSequence.
+    const objectiveHit =
+      s.currentLevel != null &&
+      !s.objectiveCompleted &&
+      evaluateObjective(next, s.currentLevel.objective);
+    const objectiveIsSolve = s.currentLevel?.objective.type === 'full_solve';
+
     set({
       cubeState: next,
       history: [...s.history, move],
@@ -100,6 +119,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       streak: solved ? 0 : newStreak,
       bestStreak,
       isNearSolved: isNear,
+      objectiveCompleted: objectiveHit ? true : s.objectiveCompleted,
     });
 
     // Emit events after the state update so subscribers see the new values.
@@ -127,6 +147,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
         moves: s.moveCount + 1,
         difficulty: s.difficulty,
         bestStreak,
+      });
+    }
+    if (objectiveHit && !objectiveIsSolve && s.currentLevel) {
+      emit({
+        type: 'objectiveCompleted',
+        levelId: s.currentLevel.id,
+        moves: s.moveCount + 1,
+        timeMs: now - startedAt,
       });
     }
   },
@@ -209,10 +237,37 @@ export const useGameStore = create<GameStore>((set, get) => ({
       bestStreak: 0,
       isNearSolved: false,
       hintMove: null,
+      objectiveCompleted: false,
     });
   },
 
   setDifficulty: (d) => set({ difficulty: d }),
+
+  loadLevel: (level) => {
+    set({ currentLevel: level, objectiveCompleted: false });
+  },
+
+  exitToMenu: () => {
+    const fresh = evaluateProgress(createSolvedCube());
+    set({
+      cubeState: createSolvedCube(),
+      history: [],
+      moveCount: 0,
+      phase: 'ready',
+      startedAt: null,
+      endedAt: null,
+      isScrambling: false,
+      progress: fresh.percentage,
+      progressDelta: 0,
+      solvedFaces: fresh.solvedFaces,
+      streak: 0,
+      bestStreak: 0,
+      isNearSolved: false,
+      hintMove: null,
+      currentLevel: null,
+      objectiveCompleted: false,
+    });
+  },
 }));
 
 export function popHistory(): Move | null {

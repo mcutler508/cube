@@ -4,16 +4,18 @@ import { HelperArrows } from './components/Cube/HelperArrows';
 import { CubeNet } from './components/HUD/CubeNet';
 import { GameHUD } from './components/HUD/GameHUD';
 import { NearSolvedGlow } from './components/HUD/NearSolvedGlow';
+import { ObjectiveBanner } from './components/HUD/ObjectiveBanner';
+import { ObjectiveCompleteOverlay } from './components/HUD/ObjectiveCompleteOverlay';
+import { LevelSelect } from './components/LevelSelect/LevelSelect';
 import { useDevKeyboard } from './interaction/useDevKeyboard';
 import { initAudio } from './audio/audio';
 import { initHaptics } from './haptics/haptics';
+import { useGameStore } from './store/gameStore';
 
 /**
- * Layout: the 3D cube fills the top flex-1 section; below it, a compact
- * unfolded net panel gives you eyes on the hidden faces. HUD chrome (timer,
- * progress meter, difficulty chip, streak badge, buttons) is absolutely
- * positioned within those regions. Audio + haptic hooks initialise once so
- * they can react to game events as soon as the first move fires.
+ * Route: when no level is loaded, show the level-select landing. Otherwise
+ * render the cube playfield with HUD chrome. Audio + haptics init once so
+ * they're ready before the first move fires.
  */
 export default function App() {
   useDevKeyboard();
@@ -22,12 +24,16 @@ export default function App() {
     initHaptics();
   }, []);
 
+  const hasLevel = useGameStore((s) => s.currentLevel !== null);
+  if (!hasLevel) return <LevelSelect />;
+
   return (
     <div className="fixed inset-0 flex h-full w-full flex-col">
       <div className="relative flex-1 overflow-hidden">
         <CubeScene />
         <NearSolvedGlow />
         <HelperArrows />
+        <ObjectiveBanner />
         <GameHUD.TopBarSlot />
       </div>
       <div
@@ -38,6 +44,7 @@ export default function App() {
         <GameHUD.BottomBarSlot />
       </div>
       <GameHUD.SolvedOverlaySlot />
+      <ObjectiveCompleteOverlay />
     </div>
   );
 }

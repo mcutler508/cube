@@ -38,6 +38,7 @@ export type GameEvent =
   | { type: 'streakIncreased'; streak: number }
   | { type: 'streakBroken'; previousStreak: number }
   | { type: 'nearSolved'; progress: number }
-  | { type: 'cubeSolved'; timeMs: number; moves: number; difficulty: Difficulty; bestStreak: number };
+  | { type: 'cubeSolved'; timeMs: number; moves: number; difficulty: Difficulty; bestStreak: number }
+  | { type: 'objectiveCompleted'; levelId: string; moves: number; timeMs: number };
 
 export type IntensityTier = 'calm' | 'warm' | 'active' | 'heightened' | 'near' | 'solved';

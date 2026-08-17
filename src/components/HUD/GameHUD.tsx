@@ -1,11 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { moveQueue } from '../../animation/moveController';
-import { enqueueScrambleMoves, enqueueUndoMove } from '../../animation/enqueue';
-import { DIFFICULTY_CONFIGS } from '../../game/difficulty';
-import { generateScramble } from '../../cube/scramble';
+import { enqueueUndoMove } from '../../animation/enqueue';
+import { exitToMenu, restartCurrentLevel } from '../../game/levels/loader';
 import { popHistory, useGameStore } from '../../store/gameStore';
-import type { Difficulty } from '../../types/game';
-import { DifficultyPicker } from './DifficultyPicker';
 import { ProgressMeter } from './ProgressMeter';
 import { SolvedSequence } from './SolvedSequence';
 import { StreakBadge } from './StreakBadge';
@@ -24,71 +21,47 @@ function useGameControls() {
     };
   }, []);
 
-  const startScrambleWith = useCallback((difficulty: Difficulty) => {
-    if (moveQueue.hasWork()) return;
-    const store = useGameStore.getState();
-    store.reset();
-    store.setDifficulty(difficulty);
-    store.beginScramble();
-    const config = DIFFICULTY_CONFIGS[difficulty];
-    const length = randomInt(config.scrambleMin, config.scrambleMax);
-    enqueueScrambleMoves(generateScramble(length));
-    const unsub = moveQueue.subscribe(() => {
-      if (!moveQueue.hasWork()) {
-        useGameStore.getState().endScramble();
-        unsub();
-      }
-    });
-  }, []);
-
   const onUndo = useCallback(() => {
     if (moveQueue.hasWork()) return;
     if (useGameStore.getState().phase === 'solved') return;
+    if (useGameStore.getState().objectiveCompleted) return;
     const inverse = popHistory();
     if (!inverse) return;
     enqueueUndoMove(inverse);
   }, []);
 
-  const onReset = useCallback(() => {
+  const onRestart = useCallback(() => {
     if (moveQueue.hasWork()) return;
-    useGameStore.getState().reset();
+    restartCurrentLevel();
   }, []);
 
-  return { busy, startScrambleWith, onUndo, onReset };
-}
+  const onMenu = useCallback(() => {
+    if (moveQueue.hasWork()) return;
+    exitToMenu();
+  }, []);
 
-function randomInt(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
+  return { busy, onUndo, onRestart, onMenu };
 }
 
 /**
  * The top overlay sits inside the cube canvas region and shows the essentials:
- *   - Timer (biggest, top-right)
- *   - Progress meter beneath it (thin energy line)
- *   - Move count (small, below meter)
- *   - Difficulty chip (top-left)
- *   - Streak badge (floating below timer, only when active)
+ *   - Timer (top-right)
+ *   - Progress meter beneath it
+ *   - Move count
+ *   - Streak badge (when active)
+ *   - Objective banner (rendered separately in App.tsx, top-center)
  */
 function TopBarSlot() {
   const moveCount = useGameStore((s) => s.moveCount);
   const phase = useGameStore((s) => s.phase);
-  const difficulty = useGameStore((s) => s.difficulty);
   const elapsed = useLiveTimer();
   const time = formatElapsed(elapsed);
 
   return (
     <div
-      className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-3 px-4 pt-3 sm:px-8"
-      style={{ paddingTop: 'max(env(safe-area-inset-top), 0.75rem)' }}
+      className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-end gap-3 px-4 pt-3 sm:px-8"
+      style={{ paddingTop: 'max(env(safe-area-inset-top), 3.25rem)' }}
     >
-      <div className="flex flex-col items-start gap-1.5">
-        <div className="rounded-2xl bg-black/40 px-3 py-1.5 text-[10px] uppercase tracking-[0.22em] text-white/65 backdrop-blur-md">
-          {DIFFICULTY_CONFIGS[difficulty].label}
-          <span className="ml-2 text-white/35">
-            {phase === 'solved' ? 'Solved' : phase === 'playing' ? 'Solving' : 'Ready'}
-          </span>
-        </div>
-      </div>
       <div className="flex min-w-[9rem] flex-col items-end gap-1">
         <div
           className="font-mono text-2xl tabular-nums leading-none text-white/95 drop-shadow sm:text-3xl"
@@ -101,6 +74,8 @@ function TopBarSlot() {
         </div>
         <div className="mt-0.5 flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-white/45">
           <span>{moveCount} {moveCount === 1 ? 'move' : 'moves'}</span>
+          <span className="text-white/25">•</span>
+          <span>{phase === 'solved' ? 'Solved' : phase === 'playing' ? 'Solving' : 'Ready'}</span>
         </div>
         <div className="mt-1">
           <StreakBadge />
@@ -111,65 +86,35 @@ function TopBarSlot() {
 }
 
 function BottomBarSlot() {
-  const isScrambling = useGameStore((s) => s.isScrambling);
   const hasHistory = useGameStore((s) => s.history.length > 0);
   const phase = useGameStore((s) => s.phase);
-  const currentDifficulty = useGameStore((s) => s.difficulty);
-  const { busy, startScrambleWith, onUndo, onReset } = useGameControls();
-  const canUndo = hasHistory && phase !== 'solved';
-  const [pickerOpen, setPickerOpen] = useState(false);
-
-  const openPicker = useCallback(() => {
-    if (busy) return;
-    setPickerOpen(true);
-  }, [busy]);
-  // Dev-only: allow `?picker=1` to auto-open the difficulty modal so it's
-  // easy to iterate on visually. Silent no-op in prod.
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('picker') === '1' && import.meta.env.DEV) setPickerOpen(true);
-  }, []);
-  const closePicker = useCallback(() => setPickerOpen(false), []);
-  const pickAndScramble = useCallback(
-    (d: Difficulty) => {
-      setPickerOpen(false);
-      startScrambleWith(d);
-    },
-    [startScrambleWith],
-  );
+  const objectiveCompleted = useGameStore((s) => s.objectiveCompleted);
+  const { busy, onUndo, onRestart, onMenu } = useGameControls();
+  const canUndo = hasHistory && phase !== 'solved' && !objectiveCompleted;
 
   return (
-    <>
-      <div className="mt-3 flex justify-center">
-        <div className="flex items-center gap-2 rounded-full bg-white/5 p-1.5 ring-1 ring-white/10">
-          <HudButton onClick={onUndo} disabled={!canUndo || busy}>
-            Undo
-          </HudButton>
-          <HudButton onClick={openPicker} primary disabled={busy}>
-            {isScrambling ? 'Scrambling…' : 'Scramble'}
-          </HudButton>
-          <HudButton onClick={onReset} disabled={busy}>
-            Reset
-          </HudButton>
-        </div>
+    <div className="mt-3 flex justify-center">
+      <div className="flex items-center gap-2 rounded-full bg-white/5 p-1.5 ring-1 ring-white/10">
+        <HudButton onClick={onMenu} disabled={busy}>
+          Menu
+        </HudButton>
+        <HudButton onClick={onUndo} disabled={!canUndo || busy}>
+          Undo
+        </HudButton>
+        <HudButton onClick={onRestart} primary disabled={busy}>
+          Restart
+        </HudButton>
       </div>
-      {pickerOpen && (
-        <DifficultyPicker
-          currentDifficulty={currentDifficulty}
-          onPick={pickAndScramble}
-          onClose={closePicker}
-        />
-      )}
-    </>
+    </div>
   );
 }
 
 function SolvedOverlaySlot() {
   const phase = useGameStore((s) => s.phase);
-  const { startScrambleWith } = useGameControls();
   if (phase !== 'solved') return null;
-  return <SolvedSequence onAgain={(d) => startScrambleWith(d)} />;
+  // Level-mode overlays route to the level actions inside SolvedSequence; the
+  // difficulty-based onAgain is a no-op fallback for the pre-levels codepath.
+  return <SolvedSequence onAgain={() => {}} />;
 }
 
 function HudButton({

@@ -3,6 +3,12 @@ import { DIFFICULTY_CONFIGS } from '../../game/difficulty';
 import { useGameStore } from '../../store/gameStore';
 import type { Difficulty } from '../../types/game';
 import { formatElapsed } from './useLiveTimer';
+import {
+  exitToMenu,
+  loadLevel,
+  restartCurrentLevel,
+} from '../../game/levels/loader';
+import { nextLevel } from '../../game/levels/catalog';
 
 interface Props {
   onAgain: (d: Difficulty) => void;
@@ -24,6 +30,7 @@ export function SolvedSequence({ onAgain }: Props) {
   const difficulty = useGameStore((s) => s.difficulty);
   const bestStreak = useGameStore((s) => s.bestStreak);
   const currentDifficulty = useGameStore((s) => s.difficulty);
+  const currentLevel = useGameStore((s) => s.currentLevel);
   const elapsedMs = startedAt !== null && endedAt !== null ? endedAt - startedAt : 0;
 
   const [stage, setStage] = useState<0 | 1 | 2>(0);
@@ -92,7 +99,10 @@ export function SolvedSequence({ onAgain }: Props) {
           </div>
         )}
 
-        {stage >= 2 && (
+        {stage >= 2 && currentLevel && (
+          <LevelActions levelId={currentLevel.id} />
+        )}
+        {stage >= 2 && !currentLevel && (
           <div
             className="mt-5 flex flex-wrap items-center justify-center gap-2"
             style={{ animation: 'popup 400ms ease-out' }}
@@ -136,6 +146,45 @@ export function SolvedSequence({ onAgain }: Props) {
         }
       `}</style>
     </div>
+  );
+}
+
+function LevelActions({ levelId }: { levelId: string }) {
+  const next = nextLevel(levelId);
+  return (
+    <div
+      className="mt-5 flex flex-wrap items-center justify-center gap-2"
+      style={{ animation: 'popup 400ms ease-out' }}
+    >
+      <ActionButton onClick={() => exitToMenu()}>Menu</ActionButton>
+      <ActionButton onClick={() => restartCurrentLevel()}>Replay</ActionButton>
+      {next && (
+        <ActionButton primary onClick={() => loadLevel(next)}>
+          Next
+        </ActionButton>
+      )}
+    </div>
+  );
+}
+
+function ActionButton({
+  children,
+  onClick,
+  primary,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  primary?: boolean;
+}) {
+  const base =
+    'min-w-[86px] rounded-full px-5 py-2.5 text-sm font-medium tracking-wide transition-all active:scale-95';
+  const style = primary
+    ? 'bg-white text-black shadow-lg shadow-black/40 hover:bg-white/95'
+    : 'bg-white/[0.08] text-white/85 ring-1 ring-white/10 hover:bg-white/15';
+  return (
+    <button type="button" onClick={onClick} className={`${base} ${style}`}>
+      {children}
+    </button>
   );
 }
 
