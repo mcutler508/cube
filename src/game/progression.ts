@@ -1,6 +1,7 @@
 import { LEVELS } from './levels/catalog';
 import type { Level, LevelTier } from './levels/types';
 import type { LevelBest } from './persistence';
+import { isDailyLevelId } from './daily';
 
 /**
  * Unlock rules (kept intentionally simple for Sprint 5):
@@ -25,6 +26,8 @@ function isTierComplete(tier: LevelTier, bests: Record<string, LevelBest>): bool
 }
 
 export function isLevelUnlocked(levelId: string, bests: Record<string, LevelBest>): boolean {
+  // Daily challenges are never gated — every player has access every day.
+  if (isDailyLevelId(levelId)) return true;
   const level = LEVELS.find((l) => l.id === levelId);
   if (!level) return false;
 

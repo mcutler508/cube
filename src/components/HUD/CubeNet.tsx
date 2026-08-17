@@ -70,7 +70,7 @@ export function CubeNet() {
 
   return (
     <div className="pointer-events-none flex items-center justify-center">
-      <div className="pointer-events-auto flex items-center gap-3 rounded-2xl bg-black/40 px-3 py-3 backdrop-blur-xl ring-1 ring-white/10">
+      <div className="pointer-events-auto flex items-center gap-3 rounded-2xl bg-black/40 px-2 py-2 backdrop-blur-xl ring-1 ring-white/10">
         <NetSvg
           net={net}
           solvedFaces={solved}
@@ -195,7 +195,7 @@ function NetSvg({
   return (
     <svg
       viewBox={`0 0 ${width} ${height}`}
-      className="block h-auto w-full max-w-[420px]"
+      className="block h-auto w-full max-w-[200px]"
       aria-label="Unfolded cube net"
     >
       {(Object.keys(facePos) as FaceLetter[]).map((face) => (

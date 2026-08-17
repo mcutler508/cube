@@ -12,6 +12,7 @@ import { evaluateObjective } from '../game/levels/evaluator';
 import type { Level } from '../game/levels/types';
 import { detectAll, rowKey, type RowRef } from '../game/detections';
 import { hintForLevel } from '../game/solver';
+import { detectAlgorithm } from '../game/algorithms';
 
 export type GamePhase = 'ready' | 'playing' | 'solved';
 
@@ -54,6 +55,10 @@ interface GameStore {
   currentLevel: Level | null;
   objectiveCompleted: boolean;
 
+  // --- menu routing ---
+  /** Which landing screen to show when no level is active. */
+  menuView: 'daily' | 'learn';
+
   // --- reducers ---
   commitPlayerMove: (move: Move) => void;
   commitScrambleMove: (move: Move) => void;
@@ -66,6 +71,7 @@ interface GameStore {
   exitToMenu: () => void;
   requestHint: () => void;
   clearHint: () => void;
+  setMenuView: (view: 'daily' | 'learn') => void;
 }
 
 const initialProgress = evaluateProgress(createSolvedCube());
@@ -95,6 +101,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   hintActive: false,
   currentLevel: null,
   objectiveCompleted: false,
+  menuView: 'daily',
 
   commitPlayerMove: (move) => {
     const s = get();
@@ -215,6 +222,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
         levelId: s.currentLevel.id,
         moves: s.moveCount + 1,
         timeMs: now - startedAt,
+      });
+    }
+
+    // Algorithm recognition: check the tail of player history against the
+    // known-trigger library. Runs against the NEW history including this
+    // move, since detection matches at the completion of the sequence.
+    const newHistory = [...s.history, move];
+    const algo = detectAlgorithm(newHistory);
+    if (algo) {
+      emit({
+        type: 'algorithmPerformed',
+        algorithmId: algo.algorithm.id,
+        algorithmName: algo.algorithm.name,
+        chain: algo.chain,
       });
     }
   },
@@ -362,6 +383,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     hintUnavailable: false,
     hintActive: false,
   }),
+
+  setMenuView: (view) => set({ menuView: view }),
 
   exitToMenu: () => {
     const fresh = evaluateProgress(createSolvedCube());

@@ -55,6 +55,10 @@ function handle(event: GameEvent) {
     case 'cubeSolved':
       pulse([15, 40, 25, 40, 40]);
       break;
+    case 'algorithmPerformed':
+      // Snap on the trigger; heavier snap for chains so repetition feels good.
+      pulse(event.chain === 1 ? [8, 20, 10] : [10, 20, 14, 20, 10]);
+      break;
     default:
       break;
   }

@@ -5,6 +5,7 @@ import { describeObjective } from '../../game/levels/labels';
 import type { Level, LevelTier } from '../../game/levels/types';
 import { getAllBests } from '../../game/persistence';
 import { isLevelUnlocked, tierProgress } from '../../game/progression';
+import { useGameStore } from '../../store/gameStore';
 import { Stars } from '../HUD/Stars';
 import type { StarCount } from '../../game/stars';
 
@@ -25,6 +26,7 @@ const TIER_TAGLINE: Record<LevelTier, string> = {
  */
 export function LevelSelect() {
   const grouped = groupByTier(LEVELS);
+  const setMenuView = useGameStore((s) => s.setMenuView);
   // PBs are read once on mount — LevelSelect is a landing screen, never
   // updates while a level is playing.
   const bests = useMemo(() => getAllBests(), []);
@@ -37,12 +39,19 @@ export function LevelSelect() {
           paddingBottom: 'max(env(safe-area-inset-bottom), 2.5rem)',
         }}
       >
-        <div className="text-[10px] uppercase tracking-[0.4em] text-white/50">Cube</div>
+        <button
+          type="button"
+          onClick={() => setMenuView('daily')}
+          className="mb-4 self-start text-[10px] uppercase tracking-[0.28em] text-white/50 hover:text-white/85"
+        >
+          ← Back to Daily
+        </button>
+        <div className="text-[10px] uppercase tracking-[0.4em] text-white/50">Learn</div>
         <h1 className="mt-1 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
           Pick a level
         </h1>
         <p className="mt-2 text-sm text-white/55">
-          Short puzzles. Tap in, twist a face, hit the objective.
+          Short puzzles that teach one move at a time.
         </p>
 
         {grouped.map(({ tier, items }) => {

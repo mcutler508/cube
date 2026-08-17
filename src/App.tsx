@@ -9,7 +9,9 @@ import { NearSolvedGlow } from './components/HUD/NearSolvedGlow';
 import { ObjectiveBanner } from './components/HUD/ObjectiveBanner';
 import { ObjectiveCompleteOverlay } from './components/HUD/ObjectiveCompleteOverlay';
 import { OnboardingCoach } from './components/HUD/OnboardingCoach';
+import { AlgorithmToast } from './components/HUD/AlgorithmToast';
 import { LevelSelect } from './components/LevelSelect/LevelSelect';
+import { DailyLanding } from './components/DailyLanding/DailyLanding';
 import { useDevKeyboard } from './interaction/useDevKeyboard';
 import { initAudio } from './audio/audio';
 import { initHaptics } from './haptics/haptics';
@@ -28,14 +30,15 @@ export default function App() {
   }, []);
 
   const currentLevelId = useGameStore((s) => s.currentLevel?.id ?? null);
+  const menuView = useGameStore((s) => s.menuView);
   if (!currentLevelId) {
     return (
       <div
-        key="menu"
+        key={`menu-${menuView}`}
         className="fixed inset-0"
         style={{ animation: 'screenIn 380ms cubic-bezier(0.16, 1, 0.3, 1)' }}
       >
-        <LevelSelect />
+        {menuView === 'daily' ? <DailyLanding /> : <LevelSelect />}
         <style>{screenTransitionCss}</style>
       </div>
     );
@@ -49,12 +52,24 @@ export default function App() {
     >
       <style>{screenTransitionCss}</style>
       <div className="relative flex-1 overflow-hidden">
-        <CubeScene />
+        {/*
+          Inset the cube canvas from the top by the objective banner's
+          height (plus safe-area). Keeps the cube's fit-to-viewport math
+          from ever drawing pixels underneath the banner on portrait
+          mobile, without shrinking the cube itself.
+        */}
+        <div
+          className="absolute inset-x-0 bottom-0"
+          style={{ top: 'calc(1.75rem + max(env(safe-area-inset-top), 0px))' }}
+        >
+          <CubeScene />
+        </div>
         <NearSolvedGlow />
         <MilestoneBurst />
         <HelperArrows />
         <ObjectiveBanner />
         <FloatingFeedback />
+        <AlgorithmToast />
         <OnboardingCoach />
         <GameHUD.TopBarSlot />
       </div>

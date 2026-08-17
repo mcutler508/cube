@@ -53,6 +53,12 @@ function handle(event: GameEvent) {
     case 'cubeSolved':
       tones.cubeSolved();
       break;
+    case 'algorithmPerformed':
+      // Reuse rowComplete for the first performance; chain > 1 gets crossComplete
+      // for a richer sting so repeated triggers feel escalating.
+      if (event.chain === 1) tones.rowComplete();
+      else tones.crossComplete();
+      break;
     // Intentional no-ops: negative/broken transitions and streak plumbing
     // stay silent — feedback should encourage, not punish.
     case 'progressDecreased':
