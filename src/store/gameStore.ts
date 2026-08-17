@@ -11,7 +11,7 @@ import { gameEvents } from '../game/events';
 import { evaluateObjective } from '../game/levels/evaluator';
 import type { Level } from '../game/levels/types';
 import { detectAll, rowKey, type RowRef } from '../game/detections';
-import { nextHintMove } from '../game/solver';
+import { hintForLevel } from '../game/solver';
 
 export type GamePhase = 'ready' | 'playing' | 'solved';
 
@@ -41,12 +41,14 @@ interface GameStore {
   streak: number;
   bestStreak: number;
   isNearSolved: boolean;
-  /** Populated by requestHint(); cleared on any move or level transition. */
+  /** Populated by requestHint(); cleared on objective completion / level transition. */
   hintMove: Move | null;
   /** True while the solver is running so UI can show a spinner / disable button. */
   hintPending: boolean;
   /** True after a solver run failed to find a hint within the depth budget. */
   hintUnavailable: boolean;
+  /** Once true, every player move auto-recomputes the hint. Cleared on objective or manual dismiss. */
+  hintActive: boolean;
 
   // --- level / objective ---
   currentLevel: Level | null;
@@ -90,6 +92,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   hintMove: null,
   hintPending: false,
   hintUnavailable: false,
+  hintActive: false,
   currentLevel: null,
   objectiveCompleted: false,
 
@@ -133,6 +136,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
       evaluateObjective(next, s.currentLevel.objective);
     const objectiveIsSolve = s.currentLevel?.objective.type === 'full_solve';
 
+    // Hint lifecycle: if a hint was active AND we just completed the objective
+    // (or fully solved), retire the hint. Otherwise keep the existing hint
+    // visible; we'll kick off a re-solve after the state update below.
+    const objectiveFinished = objectiveHit || solved;
+    const keepHintActive = s.hintActive && !objectiveFinished;
+
     set({
       cubeState: next,
       history: [...s.history, move],
@@ -150,9 +159,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
       bestStreak,
       isNearSolved: isNear,
       objectiveCompleted: objectiveHit ? true : s.objectiveCompleted,
-      hintMove: null,
+      hintMove: keepHintActive ? s.hintMove : null,
       hintUnavailable: false,
+      hintActive: keepHintActive,
     });
+
+    // Kick off a fresh hint computation while the previous badge stays visible.
+    // Cheap short-circuit if there's nothing to solve.
+    if (keepHintActive) {
+      recomputeHintSoon();
+    }
 
     // Emit events after the state update so subscribers see the new values.
     emit({ type: 'moveCompleted', move, progress: newProgress.percentage });
@@ -227,6 +243,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const solved = detectSolved(next);
     const p = evaluateProgress(next);
     const d = detectAll(next);
+    const keepHintActive = s.hintActive && !solved;
     set({
       cubeState: next,
       progress: p.percentage,
@@ -239,9 +256,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
       // Don't emit progress-change events for undos — they'd confuse the juice.
       // If undoing lands the cube on solved, don't celebrate.
       phase: solved && s.phase === 'playing' ? 'ready' : s.phase,
-      hintMove: null,
+      hintMove: keepHintActive ? s.hintMove : null,
       hintUnavailable: false,
+      hintActive: keepHintActive,
     });
+    if (keepHintActive) recomputeHintSoon();
   },
 
   beginScramble: () => {
@@ -297,6 +316,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       hintMove: null,
       hintPending: false,
       hintUnavailable: false,
+      hintActive: false,
       objectiveCompleted: false,
     });
   },
@@ -310,6 +330,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       hintMove: null,
       hintPending: false,
       hintUnavailable: false,
+      hintActive: false,
     });
   },
 
@@ -318,27 +339,29 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!s.currentLevel) return;
     if (s.phase === 'solved' || s.objectiveCompleted) return;
     if (s.hintPending) return;
+    // Toggle-off: a second press while a hint is already visible dismisses it
+    // instead of asking the solver for the same answer.
+    if (s.hintActive) {
+      set({
+        hintMove: null,
+        hintUnavailable: false,
+        hintActive: false,
+      });
+      return;
+    }
     // Solver is synchronous but can take ~half a second on the hardest levels.
     // Flip pending true first so the button greys out, then yield a tick so
     // React actually paints the disabled state before we block the main
     // thread. `setTimeout(0)` is cheap and does the trick.
-    set({ hintPending: true, hintUnavailable: false });
-    setTimeout(() => {
-      const cur = get();
-      if (!cur.currentLevel) {
-        set({ hintPending: false });
-        return;
-      }
-      const move = nextHintMove(cur.cubeState, cur.currentLevel.objective, { maxDepth: 6 });
-      set({
-        hintPending: false,
-        hintMove: move,
-        hintUnavailable: move === null,
-      });
-    }, 0);
+    set({ hintPending: true, hintUnavailable: false, hintActive: true });
+    runSolveAndSetHint();
   },
 
-  clearHint: () => set({ hintMove: null, hintUnavailable: false }),
+  clearHint: () => set({
+    hintMove: null,
+    hintUnavailable: false,
+    hintActive: false,
+  }),
 
   exitToMenu: () => {
     const fresh = evaluateProgress(createSolvedCube());
@@ -399,4 +422,36 @@ function parseRowKey(key: string): RowRef | null {
   const row = Number(key[1]);
   if (row !== 0 && row !== 1 && row !== 2) return null;
   return { face, row: row as 0 | 1 | 2 };
+}
+
+// Hint recomputation. Every request bumps a version counter; a completed
+// solve only writes back if it's still the latest, so rapid moves don't
+// splash a stale hint into the UI.
+let hintVersion = 0;
+
+function runSolveAndSetHint(): void {
+  const version = ++hintVersion;
+  setTimeout(() => {
+    const cur = useGameStore.getState();
+    if (!cur.currentLevel || !cur.hintActive) {
+      if (version === hintVersion) {
+        useGameStore.setState({ hintPending: false });
+      }
+      return;
+    }
+    const move = hintForLevel(cur.cubeState, cur.currentLevel);
+    if (version !== hintVersion) return; // a newer request has superseded us
+    useGameStore.setState({
+      hintPending: false,
+      hintMove: move,
+      hintUnavailable: move === null,
+    });
+  }, 0);
+}
+
+function recomputeHintSoon(): void {
+  // Fire from within a reducer set() — we don't want to write state again in
+  // the same tick. Delegate to the same version-tracked scheduler.
+  useGameStore.setState({ hintPending: true, hintUnavailable: false });
+  runSolveAndSetHint();
 }

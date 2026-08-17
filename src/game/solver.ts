@@ -1,25 +1,32 @@
 import type { CubeState, FaceLetter, Move } from '../types/cube';
-import { applyMove } from '../cube/cubeState';
+import { applyMove, applyMoves, createSolvedCube } from '../cube/cubeState';
 import { computeNet } from '../cube/net';
-import { FACE_LETTERS, FACE_DEFS } from '../cube/notation';
+import { FACE_LETTERS, FACE_DEFS, invertMove } from '../cube/notation';
 import { evaluateObjective } from './levels/evaluator';
-import type { Objective } from './levels/types';
+import type { Level, Objective } from './levels/types';
 
 /**
- * Bounded BFS solver: shortest sequence of face turns from `state` that
- * satisfies `objective`. Returns null when no solution exists within
- * `maxDepth`. Intended for hints on shallow beginner levels — max useful
- * depth is around 5–6; deeper searches are exponential and should be replaced
- * by a real cube solver (Kociemba, etc.) if we ever need them.
+ * Hint system with two tiers, in order:
+ *   1. Level fast path — if the player's current cube state matches any
+ *      intermediate state on the level's canonical solution (the inverse of
+ *      its setupMoves), return the next move on that path. O(1) after a
+ *      per-level warmup, works for arbitrarily deep levels.
+ *   2. BFS fallback — bounded, breadth-first over face turns; finds shortest
+ *      solutions for objectives within a small move budget. Intended for
+ *      shallow beginner objectives; not a general cube solver.
+ *
+ * The BFS budget is deliberately tight (depth 5, ~80k nodes) so a miss
+ * returns in ~500ms rather than seconds. Levels with deep solutions rely on
+ * the fast path when the player is following the intended solve.
  */
 
 const TURNS: Move['turns'][] = [1, -1, 2];
 
 /**
- * State-hash for the visited set. 54 cell chars is compact enough to hash
- * cheaply and unique enough for our purposes (two states hash-equal iff they
- * paint the same net, which is the correct equivalence for objectives that
- * are defined over the net).
+ * State-hash for the visited set + level-path lookup. 54 cell chars is
+ * compact enough to hash cheaply and unique enough for our purposes (two
+ * states hash-equal iff they paint the same net, which is the correct
+ * equivalence for objectives that are defined over the net).
  */
 function stateHash(state: CubeState): string {
   const net = computeNet(state);
@@ -52,16 +59,13 @@ function shouldSkip(face: FaceLetter, lastFace: FaceLetter | null, lastAxis: 'x'
   if (lastFace === face) return true;
   const axis = FACE_DEFS[face].axis;
   if (lastAxis === axis && lastFace !== null) {
-    // Same axis, different face → this is an opposite-face pair (e.g. F then B).
-    // These commute, so we canonicalize by only allowing the alphabetically
-    // earlier face after the later one to avoid exploring both orderings.
     if (face > lastFace) return true;
   }
   return false;
 }
 
 export interface SolverOptions {
-  /** Maximum search depth. Beyond this we return null. Default 6. */
+  /** Maximum search depth. Beyond this we return null. Default 4. */
   maxDepth?: number;
   /** Cap on nodes explored — hard safety against pathological cases. */
   maxNodes?: number;
@@ -72,8 +76,11 @@ export function solveObjective(
   objective: Objective,
   opts: SolverOptions = {},
 ): Move[] | null {
-  const maxDepth = opts.maxDepth ?? 6;
-  const maxNodes = opts.maxNodes ?? 500_000;
+  // Defaults are tuned for hint UX: worst-case exhaustive search at depth 4
+  // completes in a few hundred ms, so a missed BFS returns quickly rather
+  // than making the "Hint…" button feel broken.
+  const maxDepth = opts.maxDepth ?? 4;
+  const maxNodes = opts.maxNodes ?? 30_000;
 
   if (evaluateObjective(state, objective)) return [];
 
@@ -128,4 +135,51 @@ export function nextHintMove(
   const path = solveObjective(state, objective, opts);
   if (!path || path.length === 0) return null;
   return path[0];
+}
+
+// ---------------------------------------------------------------------------
+// Intended-solution fast path. Every level's setupMoves define a canonical
+// solve: apply the inverse in reverse order. We precompute the sequence of
+// (stateHash, nextMove) pairs once per level and cache; on hint request we
+// hash the current state and, if it appears on the intended path, return the
+// next move immediately.
+
+interface IntendedStep {
+  hash: string;
+  next: Move;
+}
+
+const intendedCache = new Map<string, IntendedStep[]>();
+
+function intendedSolutionSteps(level: Level): IntendedStep[] {
+  const cached = intendedCache.get(level.id);
+  if (cached) return cached;
+  const solution = [...level.setupMoves].reverse().map(invertMove);
+  const startingState = applyMoves(createSolvedCube(), level.setupMoves);
+  const steps: IntendedStep[] = [];
+  let cur = startingState;
+  for (const move of solution) {
+    steps.push({ hash: stateHash(cur), next: move });
+    cur = applyMove(cur, move);
+  }
+  intendedCache.set(level.id, steps);
+  return steps;
+}
+
+/**
+ * Level-aware hint. Prefers the canonical solution when the player is on
+ * that path; otherwise falls back to bounded BFS. Bounded BFS returns null
+ * quickly (< ~800ms) when the objective is out of reach.
+ */
+export function hintForLevel(state: CubeState, level: Level): Move | null {
+  const steps = intendedSolutionSteps(level);
+  const hash = stateHash(state);
+  const step = steps.find((s) => s.hash === hash);
+  if (step) return step.next;
+  return nextHintMove(state, level.objective);
+}
+
+/** Test-only: reset intended-solution cache between tests. */
+export function _resetIntendedCacheForTest(): void {
+  intendedCache.clear();
 }

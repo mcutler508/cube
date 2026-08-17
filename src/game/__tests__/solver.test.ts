@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { applyMoves, createSolvedCube } from '../../cube/cubeState';
-import { parseSequence } from '../../cube/notation';
+import { invertMove, parseSequence } from '../../cube/notation';
 import { LEVELS } from '../levels/catalog';
 import { evaluateObjective } from '../levels/evaluator';
-import { nextHintMove, solveObjective } from '../solver';
+import { hintForLevel, nextHintMove, solveObjective } from '../solver';
 
 const solved = () => createSolvedCube();
 const after = (seq: string) => applyMoves(createSolvedCube(), parseSequence(seq));
@@ -56,5 +56,45 @@ describe('solveObjective', () => {
         expect(path!.length).toBeLessThanOrEqual(level.parMoves);
       });
     }
+  });
+});
+
+describe('hintForLevel', () => {
+  it('returns a hint for every starter level from its starting state', () => {
+    // Even L6 (par 9) works because the intended-solution fast path fires
+    // immediately when the state matches a step on the canonical solve.
+    for (const level of LEVELS) {
+      const startingState = applyMoves(createSolvedCube(), level.setupMoves);
+      const hint = hintForLevel(startingState, level);
+      expect(hint, `hintForLevel returned null at start of ${level.id}`).not.toBeNull();
+    }
+  });
+
+  it('walks the canonical solution move-by-move for a deep level', () => {
+    const level = LEVELS.find((l) => l.id === 'rookie-03-getting-warmer')!;
+    let cur = applyMoves(createSolvedCube(), level.setupMoves);
+    // Apply up to parMoves hints; each should advance us and remain non-null.
+    for (let i = 0; i < level.parMoves; i++) {
+      const hint = hintForLevel(cur, level);
+      expect(hint, `null hint at step ${i}`).not.toBeNull();
+      cur = applyMoves(cur, [hint!]);
+    }
+    expect(evaluateObjective(cur, level.objective)).toBe(true);
+  });
+
+  it('returns null quickly when the player is off the canonical path and objective is too deep', () => {
+    const level = LEVELS.find((l) => l.id === 'rookie-03-getting-warmer')!;
+    // Deviate from the intended solution by making an unrelated move first.
+    let state = applyMoves(createSolvedCube(), level.setupMoves);
+    state = applyMoves(state, parseSequence('F')); // off the intended path
+    const start = performance.now();
+    const hint = hintForLevel(state, level);
+    const elapsed = performance.now() - start;
+    // We don't assert on hint value (BFS may still find something within
+    // depth 5). We only assert on elapsed time — no more 15-second hangs.
+    expect(elapsed, `hintForLevel too slow: ${elapsed}ms`).toBeLessThan(1500);
+    // Silence unused-value lint.
+    void hint;
+    void invertMove;
   });
 });

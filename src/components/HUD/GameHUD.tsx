@@ -90,10 +90,12 @@ function BottomBarSlot() {
   const phase = useGameStore((s) => s.phase);
   const objectiveCompleted = useGameStore((s) => s.objectiveCompleted);
   const hintPending = useGameStore((s) => s.hintPending);
+  const hintActive = useGameStore((s) => s.hintActive);
   const requestHint = useGameStore((s) => s.requestHint);
   const { busy, onUndo, onRestart, onMenu } = useGameControls();
   const canUndo = hasHistory && phase !== 'solved' && !objectiveCompleted;
   const canHint = phase !== 'solved' && !objectiveCompleted && !hintPending;
+  const hintLabel = hintPending ? 'Hint…' : hintActive ? 'Hide' : 'Hint';
 
   return (
     <div className="mt-3 flex justify-center">
@@ -105,7 +107,7 @@ function BottomBarSlot() {
           Undo
         </HudButton>
         <HudButton onClick={() => requestHint()} disabled={!canHint || busy}>
-          {hintPending ? 'Hint…' : 'Hint'}
+          {hintLabel}
         </HudButton>
         <HudButton onClick={onRestart} primary disabled={busy}>
           Restart

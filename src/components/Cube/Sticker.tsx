@@ -1,5 +1,6 @@
 import { RoundedBox } from '@react-three/drei';
-import { useMemo } from 'react';
+import { useFrame } from '@react-three/fiber';
+import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { FACE_COLORS, type StickerSide } from '../../cube/colors';
 import {
@@ -11,6 +12,8 @@ import {
 
 interface StickerProps {
   side: StickerSide;
+  /** True when this sticker currently lives on the hint target face. */
+  highlighted?: boolean;
 }
 
 const HALF = CUBIE_SIZE / 2;
@@ -29,9 +32,24 @@ const PLACEMENT: Record<
   back: { position: [0, 0, -HALF - STICKER_LIFT], rotation: [-Math.PI / 2, 0, 0] },
 };
 
-export function Sticker({ side }: StickerProps) {
+export function Sticker({ side, highlighted = false }: StickerProps) {
   const { position, rotation } = PLACEMENT[side];
   const color = useMemo(() => new THREE.Color(FACE_COLORS[side]), [side]);
+  const materialRef = useRef<THREE.MeshStandardMaterial>(null);
+
+  // Pulse the emissive channel when this sticker is on the hint target face.
+  // Cheap: we only touch the two float uniforms and no material allocations.
+  useFrame(({ clock }) => {
+    const mat = materialRef.current;
+    if (!mat) return;
+    if (highlighted) {
+      const w = 0.5 + 0.5 * Math.sin(clock.getElapsedTime() * 5.2);
+      mat.emissive.copy(color);
+      mat.emissiveIntensity = 0.35 + w * 0.55;
+    } else if (mat.emissiveIntensity !== 0) {
+      mat.emissiveIntensity = 0;
+    }
+  });
 
   return (
     <RoundedBox
@@ -43,6 +61,7 @@ export function Sticker({ side }: StickerProps) {
       rotation={rotation}
     >
       <meshStandardMaterial
+        ref={materialRef}
         color={color}
         roughness={0.42}
         metalness={0.04}
