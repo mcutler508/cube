@@ -166,6 +166,18 @@ export function isRowOn(net: CubeNet, face: FaceLetter, row: 0 | 1 | 2): boolean
 }
 
 /**
+ * "Middle layer complete" in beginner-cube parlance: the top layer is fully
+ * solved AND the four side-face middle rows (F/B/L/R row 1) are uniform in
+ * each face's expected color. Equivalent to: the top two horizontal layers
+ * of the cube are correct, with only the bottom layer remaining.
+ */
+export function isMiddleLayerOn(net: CubeNet): boolean {
+  if (!isLayerOn(net, 'U')) return false;
+  const sides: FaceLetter[] = ['F', 'B', 'L', 'R'];
+  return sides.every((f) => isRowOn(net, f, 1));
+}
+
+/**
  * Snapshot of every accomplished sub-goal on the cube. Callers diff two of
  * these to compute newly-completed and newly-broken sets after a move.
  */

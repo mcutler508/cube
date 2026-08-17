@@ -89,13 +89,13 @@ function BottomBarSlot() {
   const hasHistory = useGameStore((s) => s.history.length > 0);
   const phase = useGameStore((s) => s.phase);
   const objectiveCompleted = useGameStore((s) => s.objectiveCompleted);
-  const hintPending = useGameStore((s) => s.hintPending);
-  const hintActive = useGameStore((s) => s.hintActive);
+  const hintTier = useGameStore((s) => s.hintTier);
   const requestHint = useGameStore((s) => s.requestHint);
   const { busy, onUndo, onRestart, onMenu } = useGameControls();
   const canUndo = hasHistory && phase !== 'solved' && !objectiveCompleted;
-  const canHint = phase !== 'solved' && !objectiveCompleted && !hintPending;
-  const hintLabel = hintPending ? 'Hint…' : hintActive ? 'Hide' : 'Hint';
+  const canHint = phase !== 'solved' && !objectiveCompleted;
+  const hintLabel =
+    hintTier === 0 ? 'Hint' : hintTier < 4 ? `Hint +` : 'Hide';
 
   return (
     <div className="mt-3 flex justify-center">
@@ -106,7 +106,11 @@ function BottomBarSlot() {
         <HudButton onClick={onUndo} disabled={!canUndo || busy}>
           Undo
         </HudButton>
-        <HudButton onClick={() => requestHint()} disabled={!canHint || busy}>
+        <HudButton
+          onClick={() => requestHint()}
+          disabled={!canHint || busy}
+          highlighted={hintTier > 0}
+        >
           {hintLabel}
         </HudButton>
         <HudButton onClick={onRestart} primary disabled={busy}>
@@ -128,17 +132,21 @@ function HudButton({
   onClick,
   disabled,
   primary,
+  highlighted,
 }: {
   children: React.ReactNode;
   onClick: () => void;
   disabled?: boolean;
   primary?: boolean;
+  highlighted?: boolean;
 }) {
   const base =
     'min-w-[76px] rounded-full px-4 py-3 text-sm font-medium tracking-wide transition-all active:scale-95';
-  const style = primary
-    ? 'bg-white text-black shadow-lg shadow-black/40 hover:bg-white/95 disabled:bg-white/40 disabled:text-black/60'
-    : 'bg-white/[0.08] text-white/85 hover:bg-white/15 disabled:opacity-40';
+  const style = highlighted
+    ? 'bg-amber-300 text-black shadow-lg shadow-amber-500/40 hover:bg-amber-200'
+    : primary
+      ? 'bg-white text-black shadow-lg shadow-black/40 hover:bg-white/95 disabled:bg-white/40 disabled:text-black/60'
+      : 'bg-white/[0.08] text-white/85 hover:bg-white/15 disabled:opacity-40';
   return (
     <button
       type="button"

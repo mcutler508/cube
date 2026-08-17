@@ -11,12 +11,23 @@ import { gameEvents } from '../game/events';
 import { evaluateObjective } from '../game/levels/evaluator';
 import type { Level } from '../game/levels/types';
 import { detectAll, rowKey, type RowRef } from '../game/detections';
-import { hintForLevel } from '../game/solver';
+import { hintAlgorithmFor } from '../game/solver';
 import { detectAlgorithm } from '../game/algorithms';
+import { firstUnmetMilestone } from '../game/milestones';
 
 export type GamePhase = 'ready' | 'playing' | 'solved';
 
 const NEAR_SOLVED_THRESHOLD = 90;
+
+/**
+ * Progressive hint tier — 0 means no hint requested; 1..4 are escalating
+ * levels of guidance:
+ *   1 = name the current milestone target ("build the white cross")
+ *   2 = add: name the algorithm that helps ("try Sledgehammer")
+ *   3 = add: pulse the algorithm's palette button
+ *   4 = add: auto-preview the algorithm on the 2D net
+ */
+export type HintTier = 0 | 1 | 2 | 3 | 4;
 
 interface GameStore {
   // --- cube ---
@@ -42,14 +53,15 @@ interface GameStore {
   streak: number;
   bestStreak: number;
   isNearSolved: boolean;
-  /** Populated by requestHint(); cleared on objective completion / level transition. */
-  hintMove: Move | null;
-  /** True while the solver is running so UI can show a spinner / disable button. */
-  hintPending: boolean;
-  /** True after a solver run failed to find a hint within the depth budget. */
-  hintUnavailable: boolean;
-  /** Once true, every player move auto-recomputes the hint. Cleared on objective or manual dismiss. */
-  hintActive: boolean;
+
+  // --- progressive hints ---
+  hintTier: HintTier;
+  /** Human-readable name of the current unmet milestone (e.g. "White Cross"). */
+  hintTargetMilestone: string | null;
+  /** id of the recommended algorithm, or null when no path-based match exists. */
+  hintTargetAlgorithm: string | null;
+  /** Session-scoped counter of hint requests; instrumentation for a future paywall. */
+  hintCount: number;
 
   // --- level / objective ---
   currentLevel: Level | null;
@@ -57,7 +69,11 @@ interface GameStore {
 
   // --- menu routing ---
   /** Which landing screen to show when no level is active. */
-  menuView: 'daily' | 'learn';
+  menuView: 'daily' | 'learn' | 'algos';
+
+  // --- algorithm preview ---
+  /** id of an algorithm currently being previewed (not yet executed). */
+  previewAlgorithmId: string | null;
 
   // --- reducers ---
   commitPlayerMove: (move: Move) => void;
@@ -70,8 +86,9 @@ interface GameStore {
   loadLevel: (level: Level) => void;
   exitToMenu: () => void;
   requestHint: () => void;
-  clearHint: () => void;
-  setMenuView: (view: 'daily' | 'learn') => void;
+  dismissHint: () => void;
+  setMenuView: (view: 'daily' | 'learn' | 'algos') => void;
+  setPreviewAlgorithm: (id: string | null) => void;
 }
 
 const initialProgress = evaluateProgress(createSolvedCube());
@@ -95,13 +112,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
   streak: 0,
   bestStreak: 0,
   isNearSolved: false,
-  hintMove: null,
-  hintPending: false,
-  hintUnavailable: false,
-  hintActive: false,
+  hintTier: 0,
+  hintTargetMilestone: null,
+  hintTargetAlgorithm: null,
+  hintCount: 0,
   currentLevel: null,
   objectiveCompleted: false,
   menuView: 'daily',
+  previewAlgorithmId: null,
 
   commitPlayerMove: (move) => {
     const s = get();
@@ -125,29 +143,38 @@ export const useGameStore = create<GameStore>((set, get) => ({
     for (const f of newProgress.solvedFaces) if (!before.has(f)) newlyCompleted.push(f);
     for (const f of s.solvedFaces) if (!after.has(f)) newlyBroken.push(f);
 
-    // Full accomplishment snapshot (rows / crosses / layers). Faces are handled
-    // above via evaluateProgress; we duplicate face detection here rather than
-    // couple the two — the cost is one extra computeNet, which is trivial.
+    // Full accomplishment snapshot (rows / crosses / layers).
     const detections = detectAll(next);
     const nextRowKeys = detections.rows.map((r) => rowKey(r.face, r.row));
     const rowDiff = diffLists(s.solvedRows, nextRowKeys);
     const crossDiff = diffLists(s.solvedCrosses, detections.crosses);
     const layerDiff = diffLists(s.solvedLayers, detections.layers);
 
-    // Level-objective check. Only fires when playing a level and the objective
-    // wasn't already satisfied; full_solve objectives suppress the overlay to
-    // avoid double-celebration with SolvedSequence.
+    // Level-objective check.
     const objectiveHit =
       s.currentLevel != null &&
       !s.objectiveCompleted &&
       evaluateObjective(next, s.currentLevel.objective);
     const objectiveIsSolve = s.currentLevel?.objective.type === 'full_solve';
-
-    // Hint lifecycle: if a hint was active AND we just completed the objective
-    // (or fully solved), retire the hint. Otherwise keep the existing hint
-    // visible; we'll kick off a re-solve after the state update below.
     const objectiveFinished = objectiveHit || solved;
-    const keepHintActive = s.hintActive && !objectiveFinished;
+
+    // Recompute hint targets on the new state if a hint is active.
+    // Objective completion resets the hint entirely (nothing left to guide).
+    let nextHintTier: HintTier = objectiveFinished ? 0 : s.hintTier;
+    let nextTargetMilestone: string | null = null;
+    let nextTargetAlgorithm: string | null = null;
+    let nextPreviewId: string | null = null;
+    if (nextHintTier > 0) {
+      const milestone = firstUnmetMilestone(next);
+      nextTargetMilestone = milestone?.label ?? null;
+      if (nextHintTier >= 2 && s.currentLevel) {
+        const rec = hintAlgorithmFor(next, s.currentLevel);
+        nextTargetAlgorithm = rec?.id ?? null;
+      }
+      if (nextHintTier === 4) {
+        nextPreviewId = nextTargetAlgorithm;
+      }
+    }
 
     set({
       cubeState: next,
@@ -166,18 +193,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
       bestStreak,
       isNearSolved: isNear,
       objectiveCompleted: objectiveHit ? true : s.objectiveCompleted,
-      hintMove: keepHintActive ? s.hintMove : null,
-      hintUnavailable: false,
-      hintActive: keepHintActive,
+      hintTier: nextHintTier,
+      hintTargetMilestone: nextTargetMilestone,
+      hintTargetAlgorithm: nextTargetAlgorithm,
+      previewAlgorithmId: nextPreviewId,
     });
 
-    // Kick off a fresh hint computation while the previous badge stays visible.
-    // Cheap short-circuit if there's nothing to solve.
-    if (keepHintActive) {
-      recomputeHintSoon();
-    }
-
-    // Emit events after the state update so subscribers see the new values.
+    // Events after state so subscribers see fresh values.
     emit({ type: 'moveCompleted', move, progress: newProgress.percentage });
     if (delta > 0) {
       emit({ type: 'progressIncreased', amount: delta, progress: newProgress.percentage });
@@ -225,9 +247,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       });
     }
 
-    // Algorithm recognition: check the tail of player history against the
-    // known-trigger library. Runs against the NEW history including this
-    // move, since detection matches at the completion of the sequence.
+    // Algorithm recognition against the fresh history.
     const newHistory = [...s.history, move];
     const algo = detectAlgorithm(newHistory);
     if (algo) {
@@ -257,14 +277,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   commitUndoMove: (move) => {
-    // Applies the inverse move to the cube state. Move count / history are
-    // adjusted by the caller (popHistory) *before* the animation runs.
     const s = get();
     const next = applyMove(s.cubeState, move);
     const solved = detectSolved(next);
     const p = evaluateProgress(next);
     const d = detectAll(next);
-    const keepHintActive = s.hintActive && !solved;
     set({
       cubeState: next,
       progress: p.percentage,
@@ -273,15 +290,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
       solvedCrosses: d.crosses,
       solvedLayers: d.layers,
       isNearSolved: !solved && p.percentage >= NEAR_SOLVED_THRESHOLD,
-      // Undoing shouldn't advance the streak, but shouldn't destroy it either.
-      // Don't emit progress-change events for undos — they'd confuse the juice.
-      // If undoing lands the cube on solved, don't celebrate.
       phase: solved && s.phase === 'playing' ? 'ready' : s.phase,
-      hintMove: keepHintActive ? s.hintMove : null,
-      hintUnavailable: false,
-      hintActive: keepHintActive,
+      // Undo doesn't advance the hint tier, but it should refresh targets so
+      // the milestone / algorithm reflect the new state. Keep the tier.
+      previewAlgorithmId: null,
     });
-    if (keepHintActive) recomputeHintSoon();
+    // If a hint was active, request a refresh with the same tier.
+    if (s.hintTier > 0) refreshHintTargets();
   },
 
   beginScramble: () => {
@@ -301,15 +316,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   endScramble: () => {
     const s = get();
-    // Progress + solvedFaces have already been updated per scramble move.
-    // Just clear the scrambling flag and treat this as the fresh baseline.
     set({
       isScrambling: false,
       phase: 'ready',
       progressDelta: 0,
       isNearSolved: false,
-      // Baseline the progress so the *first* player move's delta is measured
-      // against the post-scramble state, not against 100.
       progress: s.progress,
     });
   },
@@ -334,11 +345,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
       streak: 0,
       bestStreak: 0,
       isNearSolved: false,
-      hintMove: null,
-      hintPending: false,
-      hintUnavailable: false,
-      hintActive: false,
       objectiveCompleted: false,
+      hintTier: 0,
+      hintTargetMilestone: null,
+      hintTargetAlgorithm: null,
+      previewAlgorithmId: null,
     });
   },
 
@@ -348,10 +359,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({
       currentLevel: level,
       objectiveCompleted: false,
-      hintMove: null,
-      hintPending: false,
-      hintUnavailable: false,
-      hintActive: false,
+      hintTier: 0,
+      hintTargetMilestone: null,
+      hintTargetAlgorithm: null,
+      hintCount: 0,
+      previewAlgorithmId: null,
     });
   },
 
@@ -359,32 +371,39 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const s = get();
     if (!s.currentLevel) return;
     if (s.phase === 'solved' || s.objectiveCompleted) return;
-    if (s.hintPending) return;
-    // Toggle-off: a second press while a hint is already visible dismisses it
-    // instead of asking the solver for the same answer.
-    if (s.hintActive) {
+    // Tier 4 is the top rung; another tap collapses back to 0 (dismiss).
+    if (s.hintTier >= 4) {
       set({
-        hintMove: null,
-        hintUnavailable: false,
-        hintActive: false,
+        hintTier: 0,
+        hintTargetMilestone: null,
+        hintTargetAlgorithm: null,
+        previewAlgorithmId: null,
       });
       return;
     }
-    // Solver is synchronous but can take ~half a second on the hardest levels.
-    // Flip pending true first so the button greys out, then yield a tick so
-    // React actually paints the disabled state before we block the main
-    // thread. `setTimeout(0)` is cheap and does the trick.
-    set({ hintPending: true, hintUnavailable: false, hintActive: true });
-    runSolveAndSetHint();
+    const nextTier = (s.hintTier + 1) as HintTier;
+    const state = s.cubeState;
+    const milestone = firstUnmetMilestone(state);
+    const rec = nextTier >= 2 ? hintAlgorithmFor(state, s.currentLevel) : null;
+    set({
+      hintTier: nextTier,
+      hintTargetMilestone: milestone?.label ?? null,
+      hintTargetAlgorithm: rec?.id ?? null,
+      previewAlgorithmId: nextTier === 4 ? (rec?.id ?? null) : s.previewAlgorithmId,
+      hintCount: s.hintCount + 1,
+    });
   },
 
-  clearHint: () => set({
-    hintMove: null,
-    hintUnavailable: false,
-    hintActive: false,
+  dismissHint: () => set({
+    hintTier: 0,
+    hintTargetMilestone: null,
+    hintTargetAlgorithm: null,
+    previewAlgorithmId: null,
   }),
 
   setMenuView: (view) => set({ menuView: view }),
+
+  setPreviewAlgorithm: (id) => set({ previewAlgorithmId: id }),
 
   exitToMenu: () => {
     const fresh = evaluateProgress(createSolvedCube());
@@ -406,9 +425,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
       streak: 0,
       bestStreak: 0,
       isNearSolved: false,
-      hintMove: null,
       currentLevel: null,
       objectiveCompleted: false,
+      hintTier: 0,
+      hintTargetMilestone: null,
+      hintTargetAlgorithm: null,
+      previewAlgorithmId: null,
     });
   },
 }));
@@ -428,7 +450,7 @@ function emit(event: GameEvent) {
   gameEvents.emit(event);
 }
 
-/** Set-diff two arrays of primitives. Order of the output is the order of appearance in the corresponding input. */
+/** Set-diff two arrays of primitives. */
 function diffLists<T>(prev: readonly T[], next: readonly T[]): { added: T[]; removed: T[] } {
   const prevSet = new Set(prev);
   const nextSet = new Set(next);
@@ -447,34 +469,19 @@ function parseRowKey(key: string): RowRef | null {
   return { face, row: row as 0 | 1 | 2 };
 }
 
-// Hint recomputation. Every request bumps a version counter; a completed
-// solve only writes back if it's still the latest, so rapid moves don't
-// splash a stale hint into the UI.
-let hintVersion = 0;
-
-function runSolveAndSetHint(): void {
-  const version = ++hintVersion;
-  setTimeout(() => {
-    const cur = useGameStore.getState();
-    if (!cur.currentLevel || !cur.hintActive) {
-      if (version === hintVersion) {
-        useGameStore.setState({ hintPending: false });
-      }
-      return;
-    }
-    const move = hintForLevel(cur.cubeState, cur.currentLevel);
-    if (version !== hintVersion) return; // a newer request has superseded us
-    useGameStore.setState({
-      hintPending: false,
-      hintMove: move,
-      hintUnavailable: move === null,
-    });
-  }, 0);
-}
-
-function recomputeHintSoon(): void {
-  // Fire from within a reducer set() — we don't want to write state again in
-  // the same tick. Delegate to the same version-tracked scheduler.
-  useGameStore.setState({ hintPending: true, hintUnavailable: false });
-  runSolveAndSetHint();
+/**
+ * Recompute the hint's milestone + algorithm targets against the current
+ * state without changing the tier. Used after undo so the visible guidance
+ * matches the cube the player is now looking at.
+ */
+function refreshHintTargets(): void {
+  const s = useGameStore.getState();
+  if (s.hintTier === 0 || !s.currentLevel) return;
+  const milestone = firstUnmetMilestone(s.cubeState);
+  const rec = s.hintTier >= 2 ? hintAlgorithmFor(s.cubeState, s.currentLevel) : null;
+  useGameStore.setState({
+    hintTargetMilestone: milestone?.label ?? null,
+    hintTargetAlgorithm: rec?.id ?? null,
+    previewAlgorithmId: s.hintTier === 4 ? (rec?.id ?? null) : s.previewAlgorithmId,
+  });
 }

@@ -4,6 +4,8 @@ import { computeNet } from '../cube/net';
 import { FACE_LETTERS, FACE_DEFS, invertMove } from '../cube/notation';
 import { evaluateObjective } from './levels/evaluator';
 import type { Level, Objective } from './levels/types';
+import { ALGORITHMS, type Algorithm } from './algorithms';
+import { firstUnmetMilestone, type MilestoneKey } from './milestones';
 
 /**
  * Hint system with two tiers, in order:
@@ -182,4 +184,74 @@ export function hintForLevel(state: CubeState, level: Level): Move | null {
 /** Test-only: reset intended-solution cache between tests. */
 export function _resetIntendedCacheForTest(): void {
   intendedCache.clear();
+}
+
+/**
+ * The generically-most-useful algorithm to reach for at each milestone. Used
+ * as a fallback recommendation when the player has deviated from the level's
+ * canonical solution path (which is nearly always, since most players don't
+ * follow the setup-inverse verbatim). Pairs each layer-by-layer step with
+ * the trigger a beginner-method solver would typically reach for.
+ */
+const MILESTONE_HINT_ALGORITHM: Record<MilestoneKey, string> = {
+  whiteCross: 'sledgehammer', // edge-flip trigger
+  firstLayer: 'sexy',         // corner-insertion trigger
+  middleLayer: 'sexy',        // middle-edge insertion variant
+  yellowCross: 'sune',        // OLL orientation
+  solved: 'sune',             // last-layer orientation
+};
+
+/**
+ * If the player is on the level's intended-solution path AND the next
+ * few moves on that path exactly match one of our known algorithms,
+ * return that algorithm. This lets the hint system recommend a specific
+ * named trigger ("Try Sledgehammer") rather than a raw move.
+ *
+ * Returns null when the player has deviated from the intended path OR
+ * when the next few moves don't match any known algorithm.
+ */
+export function recommendAlgorithmForLevel(
+  state: CubeState,
+  level: Level,
+): Algorithm | null {
+  const steps = intendedSolutionSteps(level);
+  const hash = stateHash(state);
+  const idx = steps.findIndex((s) => s.hash === hash);
+  if (idx === -1) return null;
+  const remaining: Move[] = [];
+  for (let i = idx; i < steps.length; i++) remaining.push(steps[i].next);
+
+  // Prefer longer matches (a Sune-length prefix beats a Sexy-length prefix).
+  const sorted = [...ALGORITHMS].sort((a, b) => b.moves.length - a.moves.length);
+  for (const algo of sorted) {
+    if (algo.moves.length > remaining.length) continue;
+    let match = true;
+    for (let i = 0; i < algo.moves.length; i++) {
+      if (
+        algo.moves[i].face !== remaining[i].face ||
+        algo.moves[i].turns !== remaining[i].turns
+      ) {
+        match = false;
+        break;
+      }
+    }
+    if (match) return algo;
+  }
+  return null;
+}
+
+/**
+ * Best-effort algorithm recommendation for the hint UI. Tries the exact
+ * intended-path match first; when the player has deviated, falls back to the
+ * milestone-based generic trigger. Always returns an algorithm as long as
+ * there's an unmet milestone, so hint tiers 3 (palette pulse) and 4 (preview)
+ * always have something concrete to highlight.
+ */
+export function hintAlgorithmFor(state: CubeState, level: Level): Algorithm | null {
+  const exact = recommendAlgorithmForLevel(state, level);
+  if (exact) return exact;
+  const milestone = firstUnmetMilestone(state);
+  if (!milestone) return null;
+  const fallbackId = MILESTONE_HINT_ALGORITHM[milestone.key];
+  return ALGORITHMS.find((a) => a.id === fallbackId) ?? null;
 }

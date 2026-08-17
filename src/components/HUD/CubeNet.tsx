@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { computeNet, type FaceLetter } from '../../cube/net';
 import { useGameStore } from '../../store/gameStore';
 import { useGameEvent } from '../../animation/triggers';
+import { ALGORITHMS } from '../../game/algorithms';
+import { applyMoves } from '../../cube/cubeState';
 
 /**
  * A compact 2D "unfolded net" showing all six faces of the cube at once,
@@ -24,7 +26,33 @@ const FLASH_MS = 700;
 export function CubeNet() {
   const cubies = useGameStore((s) => s.cubeState.cubies);
   const solved = useGameStore((s) => s.solvedFaces);
-  const net = useMemo(() => computeNet({ cubies }), [cubies]);
+  const previewId = useGameStore((s) => s.previewAlgorithmId);
+  const currentNet = useMemo(() => computeNet({ cubies }), [cubies]);
+
+  // When an algorithm is being previewed, compute what the cube would look
+  // like after applying it and diff against the current net so the changed
+  // cells can be highlighted.
+  const { displayNet, changed, previewName } = useMemo(() => {
+    if (!previewId) return { displayNet: currentNet, changed: null, previewName: null };
+    const algo = ALGORITHMS.find((a) => a.id === previewId);
+    if (!algo) return { displayNet: currentNet, changed: null, previewName: null };
+    const ghostState = applyMoves({ cubies }, algo.moves);
+    const ghostNet = computeNet(ghostState);
+    const diff = new Map<FaceLetter, boolean[][]>();
+    const faces: FaceLetter[] = ['U', 'D', 'L', 'R', 'F', 'B'];
+    for (const f of faces) {
+      const mask: boolean[][] = [[false, false, false], [false, false, false], [false, false, false]];
+      for (let r = 0; r < 3; r++) {
+        for (let c = 0; c < 3; c++) {
+          if (currentNet[f][r][c] !== ghostNet[f][r][c]) mask[r][c] = true;
+        }
+      }
+      diff.set(f, mask);
+    }
+    return { displayNet: ghostNet, changed: diff, previewName: algo.name };
+  }, [previewId, currentNet, cubies]);
+
+  const net = displayNet;
 
   const [faceFlash, setFaceFlash] = useState<FaceFlash | null>(null);
   const [rowFlash, setRowFlash] = useState<RowFlash | null>(null);
@@ -69,8 +97,8 @@ export function CubeNet() {
   }, [layerFlash]);
 
   return (
-    <div className="pointer-events-none flex items-center justify-center">
-      <div className="pointer-events-auto flex items-center gap-3 rounded-2xl bg-black/40 px-2 py-2 backdrop-blur-xl ring-1 ring-white/10">
+    <div className="pointer-events-none relative flex items-center justify-center">
+      <div className="pointer-events-auto relative flex items-center gap-3 rounded-2xl bg-black/40 px-2 py-2 backdrop-blur-xl ring-1 ring-white/10">
         <NetSvg
           net={net}
           solvedFaces={solved}
@@ -78,8 +106,23 @@ export function CubeNet() {
           rowFlash={rowFlash}
           crossFlash={crossFlash}
           layerFlash={layerFlash}
+          previewChanged={changed}
         />
+        {previewName && (
+          <div
+            className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-amber-300/95 px-2 py-0.5 text-[8.5px] font-bold uppercase tracking-[0.2em] text-black shadow"
+            style={{ animation: 'previewpulse 1.4s ease-in-out infinite' }}
+          >
+            Preview · {previewName}
+          </div>
+        )}
       </div>
+      <style>{`
+        @keyframes previewpulse {
+          0%, 100% { opacity: 0.9; }
+          50% { opacity: 1; box-shadow: 0 0 12px rgba(255,220,140,0.7); }
+        }
+      `}</style>
     </div>
   );
 }
@@ -152,6 +195,7 @@ function NetSvg({
   rowFlash,
   crossFlash,
   layerFlash,
+  previewChanged,
 }: {
   net: ReturnType<typeof computeNet>;
   solvedFaces: FaceLetter[];
@@ -159,6 +203,7 @@ function NetSvg({
   rowFlash: RowFlash | null;
   crossFlash: CrossFlash | null;
   layerFlash: LayerFlash | null;
+  previewChanged: Map<FaceLetter, boolean[][]> | null;
 }) {
   const CELL = 12;
   const GAP = 1.4;
@@ -214,6 +259,7 @@ function NetSvg({
           crossFlash={crossFlash?.face === face ? crossFlash : null}
           layerCells={layerHighlights.get(face) ?? null}
           layerKey={layerFlash?.key ?? null}
+          previewMask={previewChanged?.get(face) ?? null}
         />
       ))}
       <style>{`
@@ -236,6 +282,10 @@ function NetSvg({
           35% { opacity: 1; transform: scale(1.02); }
           100% { opacity: 0; transform: scale(1.06); }
         }
+        @keyframes previewCellPulse {
+          0%, 100% { opacity: 0.5; }
+          50% { opacity: 1; }
+        }
       `}</style>
     </svg>
   );
@@ -255,6 +305,7 @@ function Face({
   crossFlash,
   layerCells,
   layerKey,
+  previewMask,
 }: {
   label: string;
   x: number;
@@ -269,6 +320,7 @@ function Face({
   crossFlash: CrossFlash | null;
   layerCells: Array<[0 | 1 | 2, 0 | 1 | 2]> | null;
   layerKey: number | null;
+  previewMask: boolean[][] | null;
 }) {
   const solvedGlow = solved ? 'rgba(160, 240, 190, 0.55)' : 'rgba(255,255,255,0.08)';
   const strokeWidth = solved ? 1.1 : 0.6;
@@ -319,6 +371,30 @@ function Face({
             style={{ transition: 'fill 260ms ease-out' }}
           />
         )),
+      )}
+
+      {/* Preview: highlight cells that will change under the previewed algo. */}
+      {previewMask && (
+        <g>
+          {previewMask.map((row, r) =>
+            row.map((changed, c) =>
+              changed ? (
+                <rect
+                  key={`p-${r}-${c}`}
+                  {...cellRect(r as 0 | 1 | 2, c as 0 | 1 | 2)}
+                  rx={1.6}
+                  fill="none"
+                  stroke="rgba(255, 220, 140, 1)"
+                  strokeWidth={1.4}
+                  style={{
+                    animation: 'previewCellPulse 900ms ease-in-out infinite',
+                    filter: 'drop-shadow(0 0 2px rgba(255,220,140,0.9))',
+                  }}
+                />
+              ) : null,
+            ),
+          )}
+        </g>
       )}
 
       {/* Row flash: highlight the 3 cells of that row. */}

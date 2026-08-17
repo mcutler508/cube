@@ -1,45 +1,60 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { getAllBests } from '../../game/persistence';
-import { isDailyLevelId, isoDate, todaysDaily } from '../../game/daily';
+import {
+  DAILY_DIFFICULTIES,
+  DAILY_DIFFICULTY_LABELS,
+  DAILY_DIFFICULTY_TAGLINES,
+  DAILY_SCRAMBLE_LENGTHS,
+  dailyLevelFor,
+  isDailyLevelId,
+  isoDate,
+  parseDailyLevelId,
+  type DailyDifficulty,
+} from '../../game/daily';
 import { loadLevel } from '../../game/levels/loader';
 import { useGameStore } from '../../store/gameStore';
 import { formatElapsed } from '../HUD/useLiveTimer';
 import { Stars } from '../HUD/Stars';
 
 /**
- * Primary landing: today's Daily Cube CTA + personal-best snapshot + a small
- * link into the Learn tier for players who need a tutorial arc first.
- *
- * The scramble is deterministic per calendar day, so the "today's puzzle" is
- * the same for every player on the same day — no backend required.
+ * Primary landing. Pick your difficulty (Casual / Regular / Full — same daily
+ * scramble prefix at three depths), see today's PB for that difficulty, tap
+ * to play. Also shows all-time best for the selected difficulty plus a total
+ * days-played counter across all difficulties.
  */
 export function DailyLanding() {
   const setMenuView = useGameStore((s) => s.setMenuView);
-  const today = useMemo(() => todaysDaily(), []);
+  const [difficulty, setDifficulty] = useState<DailyDifficulty>('regular');
   const bests = useMemo(() => getAllBests(), []);
-  const todaysBest = bests[today.id];
+  const today = useMemo(() => isoDate(), []);
+  const level = useMemo(() => dailyLevelFor(today, difficulty), [today, difficulty]);
+  const todaysBest = bests[level.id];
 
-  // All-time best solve time across every daily attempt the player has ever
-  // completed. Ignores learn/rookie level times so the number reflects real
-  // full-cube solves only.
   const allTimeBest = useMemo(() => {
     let bestMs = Infinity;
     let bestDate: string | null = null;
     for (const key of Object.keys(bests)) {
-      if (!isDailyLevelId(key)) continue;
+      const parsed = parseDailyLevelId(key);
+      if (!parsed || parsed.difficulty !== difficulty) continue;
       const b = bests[key];
       if (b.bestTimeMs < bestMs) {
         bestMs = b.bestTimeMs;
-        bestDate = key.replace(/^daily-/, '');
+        bestDate = parsed.iso;
       }
     }
     return bestDate ? { ms: bestMs, date: bestDate } : null;
-  }, [bests]);
+  }, [bests, difficulty]);
 
-  const dayCount = useMemo(
-    () => Object.keys(bests).filter((k) => isDailyLevelId(k)).length,
-    [bests],
-  );
+  // Days played counts unique dates where any difficulty was completed.
+  const dayCount = useMemo(() => {
+    const dates = new Set<string>();
+    for (const key of Object.keys(bests)) {
+      if (!isDailyLevelId(key)) continue;
+      const parsed = parseDailyLevelId(key);
+      if (parsed) dates.add(parsed.iso);
+    }
+    return dates.size;
+  }, [bests]);
 
   return (
     <div className="fixed inset-0 flex flex-col overflow-y-auto bg-[#08090d] text-white">
@@ -55,17 +70,43 @@ export function DailyLanding() {
           Today's Cube
         </h1>
         <p className="mt-1 text-sm text-white/55">
-          Same scramble for everyone. New puzzle every day.
+          Same puzzle for everyone. Pick your depth.
         </p>
 
+        {/* Difficulty picker */}
+        <div className="mt-6 flex gap-1 rounded-full bg-white/[0.05] p-1 ring-1 ring-white/10">
+          {DAILY_DIFFICULTIES.map((d) => {
+            const active = d === difficulty;
+            return (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setDifficulty(d)}
+                className={[
+                  'flex-1 rounded-full px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] transition-all',
+                  active
+                    ? 'bg-white text-black shadow'
+                    : 'text-white/60 hover:text-white/85',
+                ].join(' ')}
+              >
+                {DAILY_DIFFICULTY_LABELS[d]}
+              </button>
+            );
+          })}
+        </div>
+        <div className="mt-1 text-center text-[10px] uppercase tracking-[0.22em] text-white/40">
+          {DAILY_DIFFICULTY_TAGLINES[difficulty]}
+        </div>
+
+        {/* Play CTA */}
         <button
           type="button"
-          onClick={() => loadLevel(today)}
-          className="mt-8 flex w-full items-center justify-between rounded-2xl bg-white px-5 py-5 text-left text-black shadow-lg shadow-black/40 transition-all active:scale-[0.99]"
+          onClick={() => loadLevel(level)}
+          className="mt-5 flex w-full items-center justify-between rounded-2xl bg-white px-5 py-5 text-left text-black shadow-lg shadow-black/40 transition-all active:scale-[0.99]"
         >
           <div className="flex flex-col">
             <span className="text-[10px] font-semibold uppercase tracking-[0.28em] text-black/55">
-              {isoDate()}
+              {today} · {DAILY_SCRAMBLE_LENGTHS[difficulty]} moves
             </span>
             <span className="mt-1 text-xl font-semibold">
               {todaysBest ? 'Play again' : 'Solve today'}
@@ -84,9 +125,9 @@ export function DailyLanding() {
           </div>
         </button>
 
-        <div className="mt-6 grid grid-cols-2 gap-2">
+        <div className="mt-4 grid grid-cols-2 gap-2">
           <StatCard
-            label="All-time best"
+            label={`Best ${DAILY_DIFFICULTY_LABELS[difficulty]}`}
             value={allTimeBest ? formatElapsed(allTimeBest.ms) : '—'}
             hint={allTimeBest?.date}
           />
@@ -97,7 +138,7 @@ export function DailyLanding() {
           />
         </div>
 
-        <div className="mt-8">
+        <div className="mt-8 flex flex-col gap-2">
           <button
             type="button"
             onClick={() => setMenuView('learn')}
@@ -109,6 +150,21 @@ export function DailyLanding() {
               </div>
               <div className="mt-0.5 text-[10px] uppercase tracking-[0.22em] text-white/40">
                 Short puzzles that teach the moves
+              </div>
+            </div>
+            <span className="text-white/40">→</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMenuView('algos')}
+            className="flex w-full items-center justify-between rounded-2xl bg-white/[0.04] px-4 py-4 text-left ring-1 ring-white/10 transition-all hover:bg-white/[0.08] active:scale-[0.99]"
+          >
+            <div>
+              <div className="text-sm font-medium text-white">
+                Algorithms
+              </div>
+              <div className="mt-0.5 text-[10px] uppercase tracking-[0.22em] text-white/40">
+                Triggers to chain during a solve
               </div>
             </div>
             <span className="text-white/40">→</span>

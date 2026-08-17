@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { CubeScene } from './components/Cube/CubeScene';
-import { HelperArrows } from './components/Cube/HelperArrows';
 import { CubeNet } from './components/HUD/CubeNet';
 import { GameHUD } from './components/HUD/GameHUD';
 import { FloatingFeedback } from './components/HUD/FloatingFeedback';
@@ -10,8 +9,12 @@ import { ObjectiveBanner } from './components/HUD/ObjectiveBanner';
 import { ObjectiveCompleteOverlay } from './components/HUD/ObjectiveCompleteOverlay';
 import { OnboardingCoach } from './components/HUD/OnboardingCoach';
 import { AlgorithmToast } from './components/HUD/AlgorithmToast';
+import { HintPanel } from './components/HUD/HintPanel';
+import { AlgorithmPalette } from './components/HUD/AlgorithmPalette';
+import { MilestoneChips } from './components/HUD/MilestoneChips';
 import { LevelSelect } from './components/LevelSelect/LevelSelect';
 import { DailyLanding } from './components/DailyLanding/DailyLanding';
+import { AlgorithmsPanel } from './components/Algorithms/AlgorithmsPanel';
 import { useDevKeyboard } from './interaction/useDevKeyboard';
 import { initAudio } from './audio/audio';
 import { initHaptics } from './haptics/haptics';
@@ -38,7 +41,9 @@ export default function App() {
         className="fixed inset-0"
         style={{ animation: 'screenIn 380ms cubic-bezier(0.16, 1, 0.3, 1)' }}
       >
-        {menuView === 'daily' ? <DailyLanding /> : <LevelSelect />}
+        {menuView === 'daily' && <DailyLanding />}
+        {menuView === 'learn' && <LevelSelect />}
+        {menuView === 'algos' && <AlgorithmsPanel />}
         <style>{screenTransitionCss}</style>
       </div>
     );
@@ -66,8 +71,8 @@ export default function App() {
         </div>
         <NearSolvedGlow />
         <MilestoneBurst />
-        <HelperArrows />
         <ObjectiveBanner />
+        <HintPanel />
         <FloatingFeedback />
         <AlgorithmToast />
         <OnboardingCoach />
@@ -77,7 +82,9 @@ export default function App() {
         className="relative shrink-0 border-t border-white/5 bg-[#0a0b0f]/95 px-4 pt-3"
         style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 0.75rem)' }}
       >
+        <MilestoneChips />
         <CubeNet />
+        <AlgorithmPalette />
         <GameHUD.BottomBarSlot />
       </div>
       <GameHUD.SolvedOverlaySlot />

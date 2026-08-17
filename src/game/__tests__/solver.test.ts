@@ -3,7 +3,13 @@ import { applyMoves, createSolvedCube } from '../../cube/cubeState';
 import { invertMove, parseSequence } from '../../cube/notation';
 import { LEVELS } from '../levels/catalog';
 import { evaluateObjective } from '../levels/evaluator';
-import { hintForLevel, nextHintMove, solveObjective } from '../solver';
+import {
+  hintForLevel,
+  nextHintMove,
+  recommendAlgorithmForLevel,
+  solveObjective,
+} from '../solver';
+import type { Level } from '../levels/types';
 
 const solved = () => createSolvedCube();
 const after = (seq: string) => applyMoves(createSolvedCube(), parseSequence(seq));
@@ -96,5 +102,36 @@ describe('hintForLevel', () => {
     // Silence unused-value lint.
     void hint;
     void invertMove;
+  });
+});
+
+describe('recommendAlgorithmForLevel', () => {
+  it('returns null when the player is off the intended path', () => {
+    const level = LEVELS.find((l) => l.id === 'rookie-03-getting-warmer')!;
+    // Deviate from the intended solve.
+    const state = applyMoves(
+      applyMoves(createSolvedCube(), level.setupMoves),
+      parseSequence('F'),
+    );
+    expect(recommendAlgorithmForLevel(state, level)).toBeNull();
+  });
+
+  it('recognizes a Sexy Move when the next 4 intended moves form one', () => {
+    // Construct a synthetic level whose setup inverts to a Sexy Move.
+    // Setup = inverse of R U R' U' = U R U' R'.
+    // So starting state = state after U R U' R' from solved.
+    // Intended solution = R U R' U' — a Sexy Move.
+    const level: Level = {
+      id: 'test-sexy',
+      name: 'Sexy Test',
+      tier: 'rookie',
+      setupMoves: parseSequence("U R U' R'"),
+      objective: { type: 'full_solve' },
+      parMoves: 4,
+      expertMoves: 4,
+    };
+    const state = applyMoves(createSolvedCube(), level.setupMoves);
+    const algo = recommendAlgorithmForLevel(state, level);
+    expect(algo?.id).toBe('sexy');
   });
 });
