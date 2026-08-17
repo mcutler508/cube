@@ -10,6 +10,7 @@ import { updateStreak } from '../game/streak';
 import { gameEvents } from '../game/events';
 import { evaluateObjective } from '../game/levels/evaluator';
 import type { Level } from '../game/levels/types';
+import { detectAll, rowKey, type RowRef } from '../game/detections';
 
 export type GamePhase = 'ready' | 'playing' | 'solved';
 
@@ -32,6 +33,10 @@ interface GameStore {
   progress: number; // 0–100
   progressDelta: number;
   solvedFaces: FaceLetter[];
+  /** Encoded as `${face}${row}` — see rowKey() in detections.ts. */
+  solvedRows: string[];
+  solvedCrosses: FaceLetter[];
+  solvedLayers: FaceLetter[];
   streak: number;
   bestStreak: number;
   isNearSolved: boolean;
@@ -55,6 +60,7 @@ interface GameStore {
 }
 
 const initialProgress = evaluateProgress(createSolvedCube());
+const initialDetections = detectAll(createSolvedCube());
 
 export const useGameStore = create<GameStore>((set, get) => ({
   cubeState: createSolvedCube(),
@@ -68,6 +74,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   progress: initialProgress.percentage,
   progressDelta: 0,
   solvedFaces: initialProgress.solvedFaces,
+  solvedRows: initialDetections.rows.map((r) => rowKey(r.face, r.row)),
+  solvedCrosses: initialDetections.crosses,
+  solvedLayers: initialDetections.layers,
   streak: 0,
   bestStreak: 0,
   isNearSolved: false,
@@ -97,6 +106,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
     for (const f of newProgress.solvedFaces) if (!before.has(f)) newlyCompleted.push(f);
     for (const f of s.solvedFaces) if (!after.has(f)) newlyBroken.push(f);
 
+    // Full accomplishment snapshot (rows / crosses / layers). Faces are handled
+    // above via evaluateProgress; we duplicate face detection here rather than
+    // couple the two — the cost is one extra computeNet, which is trivial.
+    const detections = detectAll(next);
+    const nextRowKeys = detections.rows.map((r) => rowKey(r.face, r.row));
+    const rowDiff = diffLists(s.solvedRows, nextRowKeys);
+    const crossDiff = diffLists(s.solvedCrosses, detections.crosses);
+    const layerDiff = diffLists(s.solvedLayers, detections.layers);
+
     // Level-objective check. Only fires when playing a level and the objective
     // wasn't already satisfied; full_solve objectives suppress the overlay to
     // avoid double-celebration with SolvedSequence.
@@ -116,6 +134,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       progress: newProgress.percentage,
       progressDelta: delta,
       solvedFaces: newProgress.solvedFaces,
+      solvedRows: nextRowKeys,
+      solvedCrosses: detections.crosses,
+      solvedLayers: detections.layers,
       streak: solved ? 0 : newStreak,
       bestStreak,
       isNearSolved: isNear,
@@ -135,6 +156,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
     for (const f of newlyCompleted) emit({ type: 'faceCompleted', face: f });
     for (const f of newlyBroken) emit({ type: 'faceBroken', face: f });
+    for (const key of rowDiff.added) {
+      const parsed = parseRowKey(key);
+      if (parsed) emit({ type: 'rowCompleted', face: parsed.face, row: parsed.row });
+    }
+    for (const key of rowDiff.removed) {
+      const parsed = parseRowKey(key);
+      if (parsed) emit({ type: 'rowBroken', face: parsed.face, row: parsed.row });
+    }
+    for (const f of crossDiff.added) emit({ type: 'crossCompleted', face: f });
+    for (const f of crossDiff.removed) emit({ type: 'crossBroken', face: f });
+    for (const f of layerDiff.added) emit({ type: 'layerCompleted', face: f });
+    for (const f of layerDiff.removed) emit({ type: 'layerBroken', face: f });
     if (newStreak > s.streak) emit({ type: 'streakIncreased', streak: newStreak });
     if (newStreak === 0 && s.streak >= 2) {
       emit({ type: 'streakBroken', previousStreak: s.streak });
@@ -163,10 +196,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const s = get();
     const next = applyMove(s.cubeState, move);
     const p = evaluateProgress(next);
+    const d = detectAll(next);
     set({
       cubeState: next,
       progress: p.percentage,
       solvedFaces: p.solvedFaces,
+      solvedRows: d.rows.map((r) => rowKey(r.face, r.row)),
+      solvedCrosses: d.crosses,
+      solvedLayers: d.layers,
       isNearSolved: false,
     });
   },
@@ -178,10 +215,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const next = applyMove(s.cubeState, move);
     const solved = detectSolved(next);
     const p = evaluateProgress(next);
+    const d = detectAll(next);
     set({
       cubeState: next,
       progress: p.percentage,
       solvedFaces: p.solvedFaces,
+      solvedRows: d.rows.map((r) => rowKey(r.face, r.row)),
+      solvedCrosses: d.crosses,
+      solvedLayers: d.layers,
       isNearSolved: !solved && p.percentage >= NEAR_SOLVED_THRESHOLD,
       // Undoing shouldn't advance the streak, but shouldn't destroy it either.
       // Don't emit progress-change events for undos — they'd confuse the juice.
@@ -222,6 +263,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   reset: () => {
     const fresh = evaluateProgress(createSolvedCube());
+    const freshDetections = detectAll(createSolvedCube());
     set({
       cubeState: createSolvedCube(),
       history: [],
@@ -233,6 +275,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       progress: fresh.percentage,
       progressDelta: 0,
       solvedFaces: fresh.solvedFaces,
+      solvedRows: freshDetections.rows.map((r) => rowKey(r.face, r.row)),
+      solvedCrosses: freshDetections.crosses,
+      solvedLayers: freshDetections.layers,
       streak: 0,
       bestStreak: 0,
       isNearSolved: false,
@@ -249,6 +294,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   exitToMenu: () => {
     const fresh = evaluateProgress(createSolvedCube());
+    const freshDetections = detectAll(createSolvedCube());
     set({
       cubeState: createSolvedCube(),
       history: [],
@@ -260,6 +306,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       progress: fresh.percentage,
       progressDelta: 0,
       solvedFaces: fresh.solvedFaces,
+      solvedRows: freshDetections.rows.map((r) => rowKey(r.face, r.row)),
+      solvedCrosses: freshDetections.crosses,
+      solvedLayers: freshDetections.layers,
       streak: 0,
       bestStreak: 0,
       isNearSolved: false,
@@ -283,4 +332,23 @@ export function popHistory(): Move | null {
 
 function emit(event: GameEvent) {
   gameEvents.emit(event);
+}
+
+/** Set-diff two arrays of primitives. Order of the output is the order of appearance in the corresponding input. */
+function diffLists<T>(prev: readonly T[], next: readonly T[]): { added: T[]; removed: T[] } {
+  const prevSet = new Set(prev);
+  const nextSet = new Set(next);
+  const added: T[] = [];
+  const removed: T[] = [];
+  for (const v of next) if (!prevSet.has(v)) added.push(v);
+  for (const v of prev) if (!nextSet.has(v)) removed.push(v);
+  return { added, removed };
+}
+
+function parseRowKey(key: string): RowRef | null {
+  if (key.length !== 2) return null;
+  const face = key[0] as FaceLetter;
+  const row = Number(key[1]);
+  if (row !== 0 && row !== 1 && row !== 2) return null;
+  return { face, row: row as 0 | 1 | 2 };
 }

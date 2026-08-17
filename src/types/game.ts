@@ -35,6 +35,12 @@ export type GameEvent =
   | { type: 'progressDecreased'; amount: number; progress: number }
   | { type: 'faceCompleted'; face: FaceLetter }
   | { type: 'faceBroken'; face: FaceLetter }
+  | { type: 'rowCompleted'; face: FaceLetter; row: 0 | 1 | 2 }
+  | { type: 'rowBroken'; face: FaceLetter; row: 0 | 1 | 2 }
+  | { type: 'crossCompleted'; face: FaceLetter }
+  | { type: 'crossBroken'; face: FaceLetter }
+  | { type: 'layerCompleted'; face: FaceLetter }
+  | { type: 'layerBroken'; face: FaceLetter }
   | { type: 'streakIncreased'; streak: number }
   | { type: 'streakBroken'; previousStreak: number }
   | { type: 'nearSolved'; progress: number }
