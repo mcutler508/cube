@@ -75,7 +75,7 @@ export default function App() {
         */}
         <div
           className="absolute inset-x-0 bottom-0"
-          style={{ top: 'calc(1.75rem + max(env(safe-area-inset-top), 0px))' }}
+          style={{ top: 'calc(1rem + max(env(safe-area-inset-top), 0px))' }}
         >
           <CubeScene />
         </div>

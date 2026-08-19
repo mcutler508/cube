@@ -60,8 +60,8 @@ function TopBarSlot() {
 
   return (
     <div
-      className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-3 px-4 pt-3 sm:px-8"
-      style={{ paddingTop: 'max(env(safe-area-inset-top), 3.25rem)' }}
+      className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-3 px-4 pt-1 sm:px-8"
+      style={{ paddingTop: 'max(env(safe-area-inset-top), 0.5rem)' }}
     >
       <button
         type="button"
@@ -79,9 +79,9 @@ function TopBarSlot() {
           />
         </svg>
       </button>
-      <div className="flex min-w-[9rem] flex-col items-end gap-1">
+      <div className="flex min-w-[9rem] flex-col items-end gap-0.5">
         <div
-          className="font-mono text-2xl tabular-nums leading-none text-white/95 drop-shadow sm:text-3xl"
+          className="font-mono text-xl tabular-nums leading-none text-white/95 drop-shadow sm:text-3xl"
           style={{ letterSpacing: '-0.01em' }}
         >
           {time}
@@ -89,14 +89,12 @@ function TopBarSlot() {
         <div className="w-40 sm:w-56">
           <ProgressMeter />
         </div>
-        <div className="mt-0.5 flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-white/45">
+        <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-white/45">
           <span>{moveCount} {moveCount === 1 ? 'move' : 'moves'}</span>
           <span className="text-white/25">•</span>
           <span>{phase === 'solved' ? 'Solved' : phase === 'playing' ? 'Solving' : 'Ready'}</span>
         </div>
-        <div className="mt-1">
-          <StreakBadge />
-        </div>
+        <StreakBadge />
       </div>
     </div>
   );
