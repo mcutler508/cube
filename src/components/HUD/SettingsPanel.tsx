@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import type { Settings } from '../../game/persistence';
 import { THEMES } from '../../cube/themes';
@@ -21,6 +21,26 @@ export function SettingsPanel() {
   const close = useGameStore((s) => s.closeSettings);
   const settings = useGameStore((s) => s.settings);
   const setSetting = useGameStore((s) => s.setSetting);
+
+  // While the panel is open, push a throwaway history entry so the phone/
+  // browser back gesture pops it (closes the panel) instead of navigating
+  // out of the app. On close, we roll history back to the pre-open state.
+  useEffect(() => {
+    if (!isOpen) return;
+    const marker = { __settingsPanel: true } as const;
+    window.history.pushState(marker, '');
+    const onPop = () => close();
+    window.addEventListener('popstate', onPop);
+    return () => {
+      window.removeEventListener('popstate', onPop);
+      // If we're unmounting because the user closed via button/scrim (not
+      // via back gesture), remove our marker from history so a subsequent
+      // back doesn't re-fire. history.state carries our marker only when
+      // our pushed entry is still current.
+      const s = window.history.state as { __settingsPanel?: boolean } | null;
+      if (s && s.__settingsPanel) window.history.back();
+    };
+  }, [isOpen, close]);
 
   if (!isOpen) return null;
 
@@ -109,6 +129,14 @@ export function SettingsPanel() {
             onChange={(v) => setSetting('showCubeNet', v)}
           />
         </Section>
+
+        <button
+          type="button"
+          onClick={close}
+          className="mt-4 w-full rounded-2xl bg-emerald-400 py-3 text-sm font-semibold text-black shadow-lg shadow-emerald-500/20 active:scale-[0.99]"
+        >
+          Done
+        </button>
 
         <style>{keyframesCss}</style>
       </div>
