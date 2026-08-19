@@ -168,3 +168,48 @@ export function _resetAllFlagsForTest(): void {
   const s = safeStorage();
   if (s) s.removeItem(FLAGS_KEY);
 }
+
+// ---------------------------------------------------------------------------
+// User settings — persisted preferences that survive across sessions. Written
+// through on every change from the settings panel. New keys land here with a
+// sensible default so old payloads read-through without a migration.
+
+const SETTINGS_KEY = 'cube:settings:v1';
+
+export interface Settings {
+  /** Show the unfolded 2D cube net beneath the play area. Off by default. */
+  showCubeNet: boolean;
+}
+
+export const DEFAULT_SETTINGS: Settings = {
+  showCubeNet: false,
+};
+
+export function loadSettings(): Settings {
+  const s = safeStorage();
+  if (!s) return { ...DEFAULT_SETTINGS };
+  const raw = s.getItem(SETTINGS_KEY);
+  if (!raw) return { ...DEFAULT_SETTINGS };
+  try {
+    const parsed = JSON.parse(raw) as Partial<Settings>;
+    return { ...DEFAULT_SETTINGS, ...parsed };
+  } catch {
+    return { ...DEFAULT_SETTINGS };
+  }
+}
+
+export function saveSettings(settings: Settings): void {
+  const s = safeStorage();
+  if (!s) return;
+  try {
+    s.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  } catch {
+    /* silently drop */
+  }
+}
+
+/** Test-only: wipe persisted settings. */
+export function _resetSettingsForTest(): void {
+  const s = safeStorage();
+  if (s) s.removeItem(SETTINGS_KEY);
+}

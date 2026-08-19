@@ -13,6 +13,7 @@ import { FlipButton } from './components/HUD/FlipButton';
 import { HintPanel } from './components/HUD/HintPanel';
 import { AlgorithmPalette } from './components/HUD/AlgorithmPalette';
 import { MilestoneChips } from './components/HUD/MilestoneChips';
+import { SettingsPanel } from './components/HUD/SettingsPanel';
 import { LevelSelect } from './components/LevelSelect/LevelSelect';
 import { DailyLanding } from './components/DailyLanding/DailyLanding';
 import { AlgorithmsPanel } from './components/Algorithms/AlgorithmsPanel';
@@ -35,6 +36,7 @@ export default function App() {
 
   const currentLevelId = useGameStore((s) => s.currentLevel?.id ?? null);
   const menuView = useGameStore((s) => s.menuView);
+  const showCubeNet = useGameStore((s) => s.settings.showCubeNet);
   if (!currentLevelId) {
     return (
       <div
@@ -85,12 +87,13 @@ export default function App() {
         style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 0.75rem)' }}
       >
         <MilestoneChips />
-        <CubeNet />
+        {showCubeNet && <CubeNet />}
         <AlgorithmPalette />
         <GameHUD.BottomBarSlot />
       </div>
       <GameHUD.SolvedOverlaySlot />
       <ObjectiveCompleteOverlay />
+      <SettingsPanel />
     </div>
   );
 }

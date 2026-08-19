@@ -14,6 +14,7 @@ import { detectAll, rowKey, type RowRef } from '../game/detections';
 import { hintAlgorithmFor } from '../game/solver';
 import { detectAlgorithm } from '../game/algorithms';
 import { firstUnmetMilestone } from '../game/milestones';
+import { loadSettings, saveSettings, type Settings } from '../game/persistence';
 
 export type GamePhase = 'ready' | 'playing' | 'solved';
 
@@ -71,6 +72,11 @@ interface GameStore {
   /** Which landing screen to show when no level is active. */
   menuView: 'daily' | 'learn' | 'algos';
 
+  // --- user settings ---
+  settings: Settings;
+  /** True while the settings panel is open (in-level overlay). */
+  isSettingsOpen: boolean;
+
   // --- algorithm preview ---
   /** id of an algorithm currently being previewed (not yet executed). */
   previewAlgorithmId: string | null;
@@ -89,6 +95,9 @@ interface GameStore {
   dismissHint: () => void;
   setMenuView: (view: 'daily' | 'learn' | 'algos') => void;
   setPreviewAlgorithm: (id: string | null) => void;
+  setSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
+  openSettings: () => void;
+  closeSettings: () => void;
 }
 
 const initialProgress = evaluateProgress(createSolvedCube());
@@ -120,6 +129,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   objectiveCompleted: false,
   menuView: 'daily',
   previewAlgorithmId: null,
+  settings: loadSettings(),
+  isSettingsOpen: false,
 
   commitPlayerMove: (move) => {
     const s = get();
@@ -404,6 +415,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setMenuView: (view) => set({ menuView: view }),
 
   setPreviewAlgorithm: (id) => set({ previewAlgorithmId: id }),
+
+  setSetting: (key, value) => {
+    const next = { ...get().settings, [key]: value };
+    saveSettings(next);
+    set({ settings: next });
+  },
+
+  openSettings: () => set({ isSettingsOpen: true }),
+  closeSettings: () => set({ isSettingsOpen: false }),
 
   exitToMenu: () => {
     const fresh = evaluateProgress(createSolvedCube());

@@ -54,14 +54,31 @@ function useGameControls() {
 function TopBarSlot() {
   const moveCount = useGameStore((s) => s.moveCount);
   const phase = useGameStore((s) => s.phase);
+  const openSettings = useGameStore((s) => s.openSettings);
   const elapsed = useLiveTimer();
   const time = formatElapsed(elapsed);
 
   return (
     <div
-      className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-end gap-3 px-4 pt-3 sm:px-8"
+      className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-3 px-4 pt-3 sm:px-8"
       style={{ paddingTop: 'max(env(safe-area-inset-top), 3.25rem)' }}
     >
+      <button
+        type="button"
+        onClick={openSettings}
+        aria-label="Settings"
+        className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.08] text-white/80 ring-1 ring-white/10 backdrop-blur transition-transform hover:bg-white/15 hover:text-white active:scale-95"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.75" />
+          <path
+            d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.07a2 2 0 1 1-2.83 2.83l-.07-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.02 1.55V21a2 2 0 1 1-4 0v-.11a1.7 1.7 0 0 0-1.11-1.55 1.7 1.7 0 0 0-1.87.34l-.07.06a2 2 0 1 1-2.83-2.83l.06-.07a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1.02H3a2 2 0 1 1 0-4h.11A1.7 1.7 0 0 0 4.66 9a1.7 1.7 0 0 0-.34-1.87l-.06-.07a2 2 0 1 1 2.83-2.83l.07.06a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1.02-1.55V3a2 2 0 1 1 4 0v.11A1.7 1.7 0 0 0 15 4.66a1.7 1.7 0 0 0 1.87-.34l.07-.06a2 2 0 1 1 2.83 2.83l-.06.07A1.7 1.7 0 0 0 19.34 9v.02a1.7 1.7 0 0 0 1.55 1.02H21a2 2 0 1 1 0 4h-.11a1.7 1.7 0 0 0-1.55 1z"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
       <div className="flex min-w-[9rem] flex-col items-end gap-1">
         <div
           className="font-mono text-2xl tabular-nums leading-none text-white/95 drop-shadow sm:text-3xl"
