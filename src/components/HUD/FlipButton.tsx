@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { viewOrientation } from '../../animation/viewOrientation';
+import { PLAQUE_SURFACE_STYLE } from './RotationTray';
 
 /**
  * Flip button — swaps the vertical pole between white-up and yellow-up.
@@ -35,19 +36,27 @@ export function FlipButton() {
       type="button"
       onClick={() => viewOrientation.flip()}
       aria-label={flipped ? 'Flip to white on top' : 'Flip to yellow on top'}
-      className="pointer-events-auto flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white/8 backdrop-blur-md ring-1 ring-white/15 shadow-lg shadow-black/40 transition-transform active:scale-90"
+      className="pointer-events-auto flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl transition-transform active:scale-95"
+      style={PLAQUE_SURFACE_STYLE}
     >
       <div className="flex flex-col items-center justify-center gap-[3px]">
         <div
           className="h-[10px] w-[22px] rounded-[3px] transition-colors"
-          style={{ backgroundColor: topColor }}
+          style={{
+            backgroundColor: topColor,
+            boxShadow:
+              'inset 0 1px 0 rgba(255,255,255,0.35), 0 1px 2px rgba(0,0,0,0.7)',
+          }}
         />
         <svg
           width="18"
           height="10"
           viewBox="0 0 18 10"
           fill="none"
-          className="opacity-70"
+          style={{
+            color: 'rgba(220, 210, 195, 0.55)',
+            filter: 'drop-shadow(0 1px 0 rgba(0,0,0,0.85))',
+          }}
         >
           <path
             d="M2 3.5A5 5 0 0 1 9 1M16 6.5A5 5 0 0 1 9 9"
@@ -64,7 +73,11 @@ export function FlipButton() {
         </svg>
         <div
           className="h-[10px] w-[22px] rounded-[3px] transition-colors"
-          style={{ backgroundColor: bottomColor }}
+          style={{
+            backgroundColor: bottomColor,
+            boxShadow:
+              'inset 0 1px 0 rgba(255,255,255,0.35), 0 1px 2px rgba(0,0,0,0.7)',
+          }}
         />
       </div>
     </button>

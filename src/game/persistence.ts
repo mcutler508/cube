@@ -179,10 +179,15 @@ const SETTINGS_KEY = 'cube:settings:v1';
 export interface Settings {
   /** Show the unfolded 2D cube net beneath the play area. Off by default. */
   showCubeNet: boolean;
+  /** Selected visual theme id (see src/cube/themes.ts). Unknown ids fall back
+   *  to the first registered theme, so removing/renaming a theme won't brick
+   *  an old saved settings object. */
+  themeId: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   showCubeNet: false,
+  themeId: 'classic',
 };
 
 export function loadSettings(): Settings {

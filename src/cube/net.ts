@@ -98,8 +98,14 @@ function findCubie(state: CubeState, pos: Vec3) {
   );
 }
 
-/** Compute all six 3×3 face grids from the logical cube state. */
-export function computeNet(state: CubeState): CubeNet {
+/** Compute all six 3×3 face grids from the logical cube state. Accepts an
+ *  optional palette so themes can retint the 2D net without touching cube
+ *  logic. Defaults to the classic FACE_COLORS palette for callers (and tests)
+ *  that don't care about theming. */
+export function computeNet(
+  state: CubeState,
+  palette: Record<StickerSide, string> = FACE_COLORS,
+): CubeNet {
   const faces: FaceLetter[] = ['U', 'D', 'L', 'R', 'F', 'B'];
   const net = {} as CubeNet;
   for (const face of faces) {
@@ -118,7 +124,7 @@ export function computeNet(state: CubeState): CubeNet {
           continue;
         }
         const side = stickerFacingDirection(cubie.rotation, normal);
-        rowColors.push(side ? FACE_COLORS[side] : '#111');
+        rowColors.push(side ? palette[side] : '#111');
       }
       grid.push(rowColors);
     }

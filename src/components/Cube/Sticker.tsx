@@ -2,7 +2,8 @@ import { RoundedBox } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
-import { FACE_COLORS, type StickerSide } from '../../cube/colors';
+import { type StickerSide } from '../../cube/colors';
+import { useActiveTheme } from '../../cube/themes';
 import {
   CUBIE_SIZE,
   STICKER_INSET,
@@ -34,7 +35,9 @@ const PLACEMENT: Record<
 
 export function Sticker({ side, highlighted = false }: StickerProps) {
   const { position, rotation } = PLACEMENT[side];
-  const color = useMemo(() => new THREE.Color(FACE_COLORS[side]), [side]);
+  const theme = useActiveTheme();
+  const hex = theme.colors[side];
+  const color = useMemo(() => new THREE.Color(hex), [hex]);
   const materialRef = useRef<THREE.MeshStandardMaterial>(null);
 
   // Pulse the emissive channel when this sticker is on the hint target face.

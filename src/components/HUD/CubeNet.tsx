@@ -4,6 +4,7 @@ import { useGameStore } from '../../store/gameStore';
 import { useGameEvent } from '../../animation/triggers';
 import { ALGORITHMS } from '../../game/algorithms';
 import { applyMoves } from '../../cube/cubeState';
+import { useActiveTheme } from '../../cube/themes';
 
 /**
  * A compact 2D "unfolded net" showing all six faces of the cube at once,
@@ -27,7 +28,8 @@ export function CubeNet() {
   const cubies = useGameStore((s) => s.cubeState.cubies);
   const solved = useGameStore((s) => s.solvedFaces);
   const previewId = useGameStore((s) => s.previewAlgorithmId);
-  const currentNet = useMemo(() => computeNet({ cubies }), [cubies]);
+  const palette = useActiveTheme().colors;
+  const currentNet = useMemo(() => computeNet({ cubies }, palette), [cubies, palette]);
 
   // When an algorithm is being previewed, compute what the cube would look
   // like after applying it and diff against the current net so the changed
@@ -37,7 +39,7 @@ export function CubeNet() {
     const algo = ALGORITHMS.find((a) => a.id === previewId);
     if (!algo) return { displayNet: currentNet, changed: null, previewName: null };
     const ghostState = applyMoves({ cubies }, algo.moves);
-    const ghostNet = computeNet(ghostState);
+    const ghostNet = computeNet(ghostState, palette);
     const diff = new Map<FaceLetter, boolean[][]>();
     const faces: FaceLetter[] = ['U', 'D', 'L', 'R', 'F', 'B'];
     for (const f of faces) {
@@ -50,7 +52,7 @@ export function CubeNet() {
       diff.set(f, mask);
     }
     return { displayNet: ghostNet, changed: diff, previewName: algo.name };
-  }, [previewId, currentNet, cubies]);
+  }, [previewId, currentNet, cubies, palette]);
 
   const net = displayNet;
 

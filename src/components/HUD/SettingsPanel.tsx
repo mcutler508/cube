@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import type { Settings } from '../../game/persistence';
+import { THEMES } from '../../cube/themes';
+import { ThemePreview } from './ThemePreview';
 
 /**
  * In-level settings overlay. Opened by the gear icon on the top HUD, closed
@@ -55,6 +57,19 @@ export function SettingsPanel() {
             </svg>
           </button>
         </div>
+
+        <Section title="Appearance">
+          <div className="grid grid-cols-2 gap-2 p-2">
+            {THEMES.map((theme) => (
+              <ThemePreview
+                key={theme.id}
+                theme={theme}
+                selected={settings.themeId === theme.id}
+                onSelect={() => setSetting('themeId', theme.id)}
+              />
+            ))}
+          </div>
+        </Section>
 
         <Section title="Gameplay">
           <ToggleRow
