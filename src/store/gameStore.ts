@@ -11,7 +11,7 @@ import { gameEvents } from '../game/events';
 import { evaluateObjective } from '../game/levels/evaluator';
 import type { Level } from '../game/levels/types';
 import { detectAll, rowKey, type RowRef } from '../game/detections';
-import { hintAlgorithmFor } from '../game/solver';
+import { hintAlgorithmFor, hintForLevel } from '../game/solver';
 import { detectAlgorithm } from '../game/algorithms';
 import { firstUnmetMilestone } from '../game/milestones';
 import { loadSettings, saveSettings, type Settings } from '../game/persistence';
@@ -61,6 +61,12 @@ interface GameStore {
   hintTargetMilestone: string | null;
   /** id of the recommended algorithm, or null when no path-based match exists. */
   hintTargetAlgorithm: string | null;
+  /**
+   * Concrete next move (from Kociemba full-solve, or the canonical level path
+   * when the player is on it). Cleared after the next player move so a stale
+   * suggestion never lingers; tap Hint again for a fresh one.
+   */
+  hintNextMove: Move | null;
   /** Session-scoped counter of hint requests; instrumentation for a future paywall. */
   hintCount: number;
 
@@ -124,6 +130,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   hintTier: 0,
   hintTargetMilestone: null,
   hintTargetAlgorithm: null,
+  hintNextMove: null,
   hintCount: 0,
   currentLevel: null,
   objectiveCompleted: false,
@@ -207,6 +214,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
       hintTier: nextHintTier,
       hintTargetMilestone: nextTargetMilestone,
       hintTargetAlgorithm: nextTargetAlgorithm,
+      // Any player move invalidates the concrete next-move hint (it was
+      // computed against the previous state). Player taps Hint again to
+      // refresh — avoids spending 100ms of blocking solve on every turn.
+      hintNextMove: null,
       previewAlgorithmId: nextPreviewId,
     });
 
@@ -360,6 +371,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       hintTier: 0,
       hintTargetMilestone: null,
       hintTargetAlgorithm: null,
+      hintNextMove: null,
       previewAlgorithmId: null,
     });
   },
@@ -373,6 +385,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       hintTier: 0,
       hintTargetMilestone: null,
       hintTargetAlgorithm: null,
+      hintNextMove: null,
       hintCount: 0,
       previewAlgorithmId: null,
     });
@@ -388,6 +401,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         hintTier: 0,
         hintTargetMilestone: null,
         hintTargetAlgorithm: null,
+        hintNextMove: null,
         previewAlgorithmId: null,
       });
       return;
@@ -396,10 +410,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const state = s.cubeState;
     const milestone = firstUnmetMilestone(state);
     const rec = nextTier >= 2 ? hintAlgorithmFor(state, s.currentLevel) : null;
+    // Concrete next-move — from canonical path if we're on it, else Kociemba
+    // full-solve. May be null if the level is already complete or the
+    // Kociemba pruning tables haven't finished warming.
+    const nextMove = hintForLevel(state, s.currentLevel);
     set({
       hintTier: nextTier,
       hintTargetMilestone: milestone?.label ?? null,
       hintTargetAlgorithm: rec?.id ?? null,
+      hintNextMove: nextMove,
       previewAlgorithmId: nextTier === 4 ? (rec?.id ?? null) : s.previewAlgorithmId,
       hintCount: s.hintCount + 1,
     });
@@ -409,6 +428,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     hintTier: 0,
     hintTargetMilestone: null,
     hintTargetAlgorithm: null,
+    hintNextMove: null,
     previewAlgorithmId: null,
   }),
 
@@ -450,6 +470,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       hintTier: 0,
       hintTargetMilestone: null,
       hintTargetAlgorithm: null,
+      hintNextMove: null,
       previewAlgorithmId: null,
     });
   },
@@ -499,9 +520,11 @@ function refreshHintTargets(): void {
   if (s.hintTier === 0 || !s.currentLevel) return;
   const milestone = firstUnmetMilestone(s.cubeState);
   const rec = s.hintTier >= 2 ? hintAlgorithmFor(s.cubeState, s.currentLevel) : null;
+  const nextMove = hintForLevel(s.cubeState, s.currentLevel);
   useGameStore.setState({
     hintTargetMilestone: milestone?.label ?? null,
     hintTargetAlgorithm: rec?.id ?? null,
+    hintNextMove: nextMove,
     previewAlgorithmId: s.hintTier === 4 ? (rec?.id ?? null) : s.previewAlgorithmId,
   });
 }

@@ -5,6 +5,8 @@ import { THEMES } from '../../cube/themes';
 import { ThemePreview } from './ThemePreview';
 import { RETICLE_STYLES, resolveReticleStyle } from '../../cube/reticleStyles';
 import { ReticlePreview } from './ReticlePreview';
+import { BACKGROUNDS, resolveBackground } from '../../cube/backgrounds';
+import { BackgroundPreview } from './BackgroundPreview';
 
 /**
  * In-level settings overlay. Opened by the gear icon on the top HUD, closed
@@ -68,6 +70,19 @@ export function SettingsPanel() {
                 theme={theme}
                 selected={settings.themeId === theme.id}
                 onSelect={() => setSetting('themeId', theme.id)}
+              />
+            ))}
+          </div>
+        </Section>
+
+        <Section title="Background">
+          <div className="grid grid-cols-3 gap-2 p-2">
+            {BACKGROUNDS.map((bg) => (
+              <BackgroundPreview
+                key={bg.id}
+                background={bg}
+                selected={resolveBackground(settings.backgroundId).id === bg.id}
+                onSelect={() => setSetting('backgroundId', bg.id)}
               />
             ))}
           </div>

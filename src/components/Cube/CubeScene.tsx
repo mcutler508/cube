@@ -30,14 +30,15 @@ export function CubeScene() {
       gl={{ antialias: true, powerPreference: 'high-performance' }}
       camera={{ position: initial, fov: FOV }}
       onCreated={({ gl, scene, camera }) => {
-        gl.setClearColor('#0d0f13');
+        // Transparent clear color so the CSS background painted on the level
+        // wrapper (see App.tsx) shows through behind the cube.
+        gl.setClearColor('#000000', 0);
         gl.toneMapping = THREE.ACESFilmicToneMapping;
         gl.toneMappingExposure = 1.05;
         scene.fog = new THREE.Fog('#0d0f13', 14, 24);
         camera.lookAt(0, 0, 0);
       }}
     >
-      <color attach="background" args={['#0d0f13']} />
       <ambientLight intensity={0.55} />
       <directionalLight
         position={[6, 8, 4]}

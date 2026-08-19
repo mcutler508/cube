@@ -186,12 +186,16 @@ export interface Settings {
   /** Selected direction-indicator style id (see src/cube/reticleStyles.ts).
    *  Unknown ids fall back to the default style. */
   reticleStyle: string;
+  /** Selected play-field background id (see src/cube/backgrounds.ts). Unknown
+   *  ids fall back to the first registered background. */
+  backgroundId: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   showCubeNet: false,
   themeId: 'classic',
   reticleStyle: 'hud',
+  backgroundId: 'graphite',
 };
 
 export function loadSettings(): Settings {

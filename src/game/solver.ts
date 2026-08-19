@@ -6,6 +6,7 @@ import { evaluateObjective } from './levels/evaluator';
 import type { Level, Objective } from './levels/types';
 import { ALGORITHMS, type Algorithm } from './algorithms';
 import { firstUnmetMilestone, type MilestoneKey } from './milestones';
+import { kociembaNextMove } from './kociembaSolver';
 
 /**
  * Hint system with two tiers, in order:
@@ -170,14 +171,17 @@ function intendedSolutionSteps(level: Level): IntendedStep[] {
 
 /**
  * Level-aware hint. Prefers the canonical solution when the player is on
- * that path; otherwise falls back to bounded BFS. Bounded BFS returns null
- * quickly (< ~800ms) when the objective is out of reach.
+ * that path; otherwise asks Kociemba for the next move of a full solve
+ * (works from any state); finally falls back to bounded BFS if Kociemba's
+ * pruning tables haven't finished warming up.
  */
 export function hintForLevel(state: CubeState, level: Level): Move | null {
   const steps = intendedSolutionSteps(level);
   const hash = stateHash(state);
   const step = steps.find((s) => s.hash === hash);
   if (step) return step.next;
+  const koc = kociembaNextMove(state);
+  if (koc) return koc;
   return nextHintMove(state, level.objective);
 }
 

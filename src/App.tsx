@@ -19,7 +19,9 @@ import { AlgorithmsPanel } from './components/Algorithms/AlgorithmsPanel';
 import { useDevKeyboard } from './interaction/useDevKeyboard';
 import { initAudio } from './audio/audio';
 import { initHaptics } from './haptics/haptics';
+import { warmKociembaSolver } from './game/kociembaSolver';
 import { useGameStore } from './store/gameStore';
+import { resolveBackground, type CubeBackground } from './cube/backgrounds';
 
 /**
  * Route: when no level is loaded, show the level-select landing. Otherwise
@@ -31,11 +33,13 @@ export default function App() {
   useEffect(() => {
     initAudio();
     initHaptics();
+    warmKociembaSolver();
   }, []);
 
   const currentLevelId = useGameStore((s) => s.currentLevel?.id ?? null);
   const menuView = useGameStore((s) => s.menuView);
   const showCubeNet = useGameStore((s) => s.settings.showCubeNet);
+  const background = useGameStore((s) => resolveBackground(s.settings.backgroundId));
   if (!currentLevelId) {
     return (
       <div
@@ -55,7 +59,11 @@ export default function App() {
     <div
       key={`level-${currentLevelId}`}
       className="fixed inset-0 flex h-full w-full flex-col"
-      style={{ animation: 'screenIn 380ms cubic-bezier(0.16, 1, 0.3, 1)' }}
+      style={{
+        animation: 'screenIn 380ms cubic-bezier(0.16, 1, 0.3, 1)',
+        background: buildBackgroundCss(background),
+        backgroundColor: background.color,
+      }}
     >
       <style>{screenTransitionCss}</style>
       <div className="relative flex-1 overflow-hidden">
@@ -103,3 +111,20 @@ const screenTransitionCss = `
     to { opacity: 1; transform: scale(1); }
   }
 `;
+
+/**
+ * Compose the CSS `background` shorthand for the level view. Layer order is
+ * top-to-bottom in CSS: any overlay is painted above the image, and the fallback
+ * solid color sits behind everything (visible until the image loads and behind
+ * any letterboxed edges).
+ */
+function buildBackgroundCss(bg: CubeBackground): string {
+  const layers: string[] = [];
+  if (bg.overlay) layers.push(bg.overlay);
+  if (bg.src) {
+    const size = bg.size ?? 'cover';
+    layers.push(`url("${bg.src}") center/${size} no-repeat`);
+  }
+  layers.push(bg.color);
+  return layers.join(', ');
+}

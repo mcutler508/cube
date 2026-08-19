@@ -45,6 +45,30 @@ export function resolveReticleStyle(id: string): ReticleStyleId {
     : DEFAULT_RETICLE_STYLE_ID;
 }
 
+/**
+ * Per-style idle animation knobs. All animation is whole-plane (emissive
+ * brightness and/or a small scale pulse) except for `sweep`, which asks the
+ * Sticker to spawn two extra scan-bar meshes that translate along each axis.
+ *
+ * Amplitudes are additive on top of the base emissive intensity / scale.
+ * Frequencies are Hz. A per-sticker phase offset (random on mount) is added
+ * so the cube "breathes" rather than strobing.
+ */
+export interface ReticleStyleAnim {
+  emissivePulse?: { amp: number; freq: number };
+  scalePulse?: { amp: number; freq: number };
+  sweep?: boolean;
+}
+
+export const RETICLE_ANIM: Record<ReticleStyleId, ReticleStyleAnim> = {
+  hud:     { emissivePulse: { amp: 0.35, freq: 0.42 } },
+  scan:    { emissivePulse: { amp: 0.25, freq: 0.40 }, sweep: true },
+  ink:     {}, // mockup shows the ink brush static; matching that.
+  arcade:  { emissivePulse: { amp: 0.35, freq: 0.72 }, scalePulse: { amp: 0.06, freq: 0.72 } },
+  circuit: { emissivePulse: { amp: 0.45, freq: 0.50 } },
+  compass: { emissivePulse: { amp: 0.30, freq: 0.34 }, scalePulse: { amp: 0.03, freq: 0.34 } },
+};
+
 const TEXTURE_SIZE = 256;
 const LOGICAL_SIZE = 100;
 

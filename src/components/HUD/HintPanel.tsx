@@ -1,35 +1,27 @@
 import { useGameStore } from '../../store/gameStore';
-import { ALGORITHMS } from '../../game/algorithms';
+import { formatMove } from '../../cube/notation';
 
 /**
- * Escalating hint text. Each tier of the hint ladder adds one more piece of
- * information without replacing the previous — a beginner who taps hint 4
- * times has milestone + algorithm + palette pulse + preview all visible at
- * once. Text is always at the top of the cube region so the eye finds it.
+ * Hint text. Shows the concrete next move (from the Kociemba solver, or the
+ * canonical level path if the player is still on it) plus the milestone
+ * they're working toward. Named-algorithm suggestions ("Try Sledgehammer",
+ * palette-pulse, net-preview) are intentionally suppressed — the player
+ * asked us to keep hints trigger-agnostic.
  */
 export function HintPanel() {
   const tier = useGameStore((s) => s.hintTier);
   const milestone = useGameStore((s) => s.hintTargetMilestone);
-  const algoId = useGameStore((s) => s.hintTargetAlgorithm);
+  const nextMove = useGameStore((s) => s.hintNextMove);
   const dismissHint = useGameStore((s) => s.dismissHint);
 
   if (tier === 0) return null;
 
-  const algo = algoId ? ALGORITHMS.find((a) => a.id === algoId) ?? null : null;
-
   const lines: string[] = [];
+  if (nextMove) {
+    lines.push(`Next move: ${formatMove(nextMove)}`);
+  }
   if (milestone) {
-    lines.push(`Now: build the ${milestone.toLowerCase()}`);
-  }
-  if (tier >= 2) {
-    if (algo) lines.push(`Try ${algo.name}`);
-    else lines.push('Common triggers help — try one from the palette');
-  }
-  if (tier >= 3 && algo) {
-    lines.push('Highlighted in the palette ↓');
-  }
-  if (tier === 4 && algo) {
-    lines.push('Preview showing on the net ↓');
+    lines.push(`Working toward: ${milestone.toLowerCase()}`);
   }
 
   return (
