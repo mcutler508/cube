@@ -183,11 +183,15 @@ export interface Settings {
    *  to the first registered theme, so removing/renaming a theme won't brick
    *  an old saved settings object. */
   themeId: string;
+  /** Selected direction-indicator style id (see src/cube/reticleStyles.ts).
+   *  Unknown ids fall back to the default style. */
+  reticleStyle: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   showCubeNet: false,
   themeId: 'classic',
+  reticleStyle: 'hud',
 };
 
 export function loadSettings(): Settings {

@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Cube reticle styles — mockup</title>
+<style>
+  :root {
+    --bg: #0b0c10;
+    --bg-2: #14161c;
+    --ink: #e8ecf3;
+    --dim: #8b93a5;
+    --line: rgba(255,255,255,0.08);
+    --cyan: #7ee9ff;
+    --amber: #ffcc66;
+    --hot: #ff6b8a;
+    --face-red: #d62828;
+    --face-orange: #f77f00;
+    --face-white: #f8f8f2;
+    --face-yellow: #f6c000;
+    --face-green: #2a9d5c;
+    --face-blue: #1e5fb8;
+    --cubie: #0b0c10;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink);
+    font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  header {
+    padding: 40px 32px 24px;
+    max-width: 1200px; margin: 0 auto;
+  }
+  header h1 {
+    font: 600 26px/1.2 "Iowan Old Style", Georgia, serif;
+    letter-spacing: -0.01em; margin: 0 0 8px;
+  }
+  header p { color: var(--dim); margin: 0; max-width: 68ch; }
+  header .legend {
+    margin-top: 20px; display: flex; gap: 14px; flex-wrap: wrap;
+    font-size: 12px; color: var(--dim);
+  }
+  header .legend span::before {
+    content: ""; display: inline-block; width: 10px; height: 10px;
+    border-radius: 2px; vertical-align: -1px; margin-right: 6px;
+  }
+  .legend .red::before { background: var(--face-red); }
+  .legend .yellow::before { background: var(--face-yellow); }
+  .legend .blue::before { background: var(--face-blue); }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 20px;
+    padding: 8px 32px 60px;
+    max-width: 1200px; margin: 0 auto;
+  }
+  .card {
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 20px;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .card h2 {
+    font: 600 15px/1.2 -apple-system, sans-serif;
+    letter-spacing: 0.02em; text-transform: uppercase; margin: 0;
+    color: var(--ink);
+  }
+  .card .kicker {
+    font: 500 10px/1 -apple-system, sans-serif;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--amber);
+  }
+  .card p { color: var(--dim); margin: 0; font-size: 13px; }
+
+  /* Stickers */
+  .stage {
+    display: grid; grid-template-columns: 1fr; gap: 12px;
+    margin-top: 4px;
+  }
+  .big {
+    aspect-ratio: 1 / 1;
+    border-radius: 14px;
+    position: relative;
+    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .chips {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  }
+  .chip {
+    aspect-ratio: 1 / 1;
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .face-red    { background: var(--face-red);    }
+  .face-yellow { background: var(--face-yellow); }
+  .face-blue   { background: var(--face-blue);   }
+
+  /* Give the sticker a hint of the cube-body bezel so the mockup reads like
+     the actual game piece — thin dark inset + subtle highlight top. */
+  .sticker::before {
+    content: ""; position: absolute; inset: 0;
+    box-shadow:
+      inset 0 0 0 1px rgba(0,0,0,0.25),
+      inset 0 1px 0 rgba(255,255,255,0.14),
+      inset 0 -8px 14px rgba(0,0,0,0.18);
+    border-radius: inherit;
+    pointer-events: none;
+  }
+
+  svg.reticle { width: 78%; height: 78%; overflow: visible; }
+  .chip svg.reticle { width: 82%; height: 82%; }
+
+  /* ------- shared reticle look ------- */
+  .stroke-cyan { stroke: var(--cyan); }
+  .fill-cyan { fill: var(--cyan); }
+  .glow-cyan { filter: drop-shadow(0 0 3px rgba(126,233,255,0.9))
+                       drop-shadow(0 0 6px rgba(126,233,255,0.45)); }
+
+  /* ==============================================
+     STYLE 1 — Cyberpunk HUD crosshair
+     Corner brackets + tick marks + thin center cross.
+     Reads as a targeting reticle from a mech/shooter.
+  ============================================== */
+  .r1 { animation: r1-pulse 2.4s ease-in-out infinite; }
+  @keyframes r1-pulse {
+    0%, 100% { opacity: 0.85; }
+    50% { opacity: 1; }
+  }
+
+  /* ==============================================
+     STYLE 2 — Holographic scan lines
+     Dashed axes with a bright segment sweeping along.
+  ============================================== */
+  .r2 .dash { stroke-dasharray: 6 4; opacity: 0.55; }
+  .r2 .sweep-h { animation: r2-sweep-h 1.6s linear infinite; }
+  .r2 .sweep-v { animation: r2-sweep-v 1.6s linear infinite; }
+  @keyframes r2-sweep-h {
+    0% { transform: translateX(-40px); opacity: 0; }
+    15% { opacity: 1; }
+    85% { opacity: 1; }
+    100% { transform: translateX(40px); opacity: 0; }
+  }
+  @keyframes r2-sweep-v {
+    0% { transform: translateY(-40px); opacity: 0; }
+    15% { opacity: 1; }
+    85% { opacity: 1; }
+    100% { transform: translateY(40px); opacity: 0; }
+  }
+
+  /* ==============================================
+     STYLE 3 — Ink brush / gestural
+     Tapered brush strokes, warm off-white.
+  ============================================== */
+  .r3-ink { fill: #f7efe0; opacity: 0.92; }
+  .r3-ink.small { opacity: 0.7; }
+
+  /* ==============================================
+     STYLE 4 — Arcade energy arrows
+     Chevron tips pointing outward. Fighting-game inputs.
+  ============================================== */
+  .r4 .arrow { animation: r4-bump 1.4s ease-in-out infinite; transform-origin: 50px 50px; }
+  .r4 .arrow.a2 { animation-delay: 0.35s; }
+  .r4 .arrow.a3 { animation-delay: 0.7s; }
+  .r4 .arrow.a4 { animation-delay: 1.05s; }
+  @keyframes r4-bump {
+    0%, 100% { transform: scale(1); opacity: 0.9; }
+    50% { transform: scale(1.08); opacity: 1; }
+  }
+
+  /* ==============================================
+     STYLE 5 — Neon circuit
+     Thin lines + glowing node dots at center & endpoints.
+  ============================================== */
+  .r5 .node { animation: r5-glow 2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+  .r5 .node.n2 { animation-delay: 0.5s; }
+  .r5 .node.n3 { animation-delay: 1s; }
+  .r5 .node.n4 { animation-delay: 1.5s; }
+  @keyframes r5-glow {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; }
+  }
+
+  /* ==============================================
+     STYLE 6 — Compass diamond
+     Rotated square frame + pips at cardinal points.
+  ============================================== */
+  .r6 .frame { animation: r6-breathe 3s ease-in-out infinite; transform-origin: 50px 50px; }
+  @keyframes r6-breathe {
+    0%, 100% { transform: rotate(45deg) scale(1); opacity: 0.85; }
+    50% { transform: rotate(45deg) scale(1.04); opacity: 1; }
+  }
+
+  footer {
+    max-width: 1200px; margin: 0 auto; padding: 0 32px 60px;
+    color: var(--dim); font-size: 12px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="kicker" style="color:#ffcc66; font: 500 10px/1 sans-serif; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom:10px;">Mockup · Cube reticle styles</div>
+  <h1>Six directions for the direction indicator</h1>
+  <p>Each tile shows one aesthetic take on the reticle that sits on every sticker. The large sample is the "hero" read; the three small chips below show how the same reticle reads across a warm face (red), a bright face (yellow), and a cool face (blue). All examples animate at rest — commit-flash brightening would layer on top of these.</p>
+  <div class="legend">
+    <span class="red">Red face (warm)</span>
+    <span class="yellow">Yellow face (bright)</span>
+    <span class="blue">Blue face (cool)</span>
+  </div>
+</header>
+
+<div class="grid">
+
+  <!-- ============ 1. Cyberpunk HUD ============ -->
+  <div class="card">
+    <div class="kicker">Option 01</div>
+    <h2>Cyberpunk HUD crosshair</h2>
+    <p>Corner brackets frame the piece like a target lock; short tick marks anchor each axis; a thin center cross keeps the read. Feels like a mech / shooter reticle — technical, decisive, "you are aiming."</p>
+    <div class="stage">
+      <div class="big sticker face-red">
+        <svg class="reticle" viewBox="0 0 100 100">
+          <g class="r1 stroke-cyan glow-cyan" fill="none" stroke-width="1.8" stroke-linecap="square">
+            <!-- 4 L-brackets -->
+            <path d="M 14 22 L 14 14 L 22 14" />
+            <path d="M 86 22 L 86 14 L 78 14" />
+            <path d="M 14 78 L 14 86 L 22 86" />
+            <path d="M 86 78 L 86 86 L 78 86" />
+            <!-- center cross -->
+            <line x1="30" y1="50" x2="70" y2="50" />
+            <line x1="50" y1="30" x2="50" y2="70" />
+            <!-- axis ticks at edge midpoints -->
+            <line x1="6"  y1="50" x2="11" y2="50" stroke-width="1.4" />
+            <line x1="89" y1="50" x2="94" y2="50" stroke-width="1.4" />
+            <line x1="50" y1="6"  x2="50" y2="11" stroke-width="1.4" />
+            <line x1="50" y1="89" x2="50" y2="94" stroke-width="1.4" />
+            <!-- center dot -->
+            <circle cx="50" cy="50" r="1.6" fill="#7ee9ff" stroke="none" />
+          </g>
+        </svg>
+      </div>
+      <div class="chips">
+        <div class="chip sticker face-red"><svg class="reticle" viewBox="0 0 100 100"><g class="r1 stroke-cyan glow-cyan" fill="none" stroke-width="1.8"><path d="M14 22 L14 14 L22 14"/><path d="M86 22 L86 14 L78 14"/><path d="M14 78 L14 86 L22 86"/><path d="M86 78 L86 86 L78 86"/><line x1="30" y1="50" x2="70" y2="50"/><line x1="50" y1="30" x2="50" y2="70"/></g></svg></div>
+        <div class="chip sticker face-yellow"><svg class="reticle" viewBox="0 0 100 100"><g class="r1 stroke-cyan glow-cyan" fill="none" stroke-width="1.8"><path d="M14 22 L14 14 L22 14"/><path d="M86 22 L86 14 L78 14"/><path d="M14 78 L14 86 L22 86"/><path d="M86 78 L86 86 L78 86"/><line x1="30" y1="50" x2="70" y2="50"/><line x1="50" y1="30" x2="50" y2="70"/></g></svg></div>
+        <div class="chip sticker face-blue"><svg class="reticle" viewBox="0 0 100 100"><g class="r1 stroke-cyan glow-cyan" fill="none" stroke-width="1.8"><path d="M14 22 L14 14 L22 14"/><path d="M86 22 L86 14 L78 14"/><path d="M14 78 L14 86 L22 86"/><path d="M86 78 L86 86 L78 86"/><line x1="30" y1="50" x2="70" y2="50"/><line x1="50" y1="30" x2="50" y2="70"/></g></svg></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 2. Holographic scan ============ -->
+  <div class="card">
+    <div class="kicker">Option 02</div>
+    <h2>Holographic scan lines</h2>
+    <p>Dashed axes at low opacity with a bright "scan segment" that sweeps along each bar on a loop. Feels lighter and floatier — a projected hologram rather than a painted marker. Naturally implies motion.</p>
+    <div class="stage">
+      <div class="big sticker face-red">
+        <svg class="reticle r2" viewBox="0 0 100 100">
+          <g class="stroke-cyan glow-cyan" fill="none" stroke-width="1.6" stroke-linecap="round">
+            <line class="dash" x1="14" y1="50" x2="86" y2="50" />
+            <line class="dash" x1="50" y1="14" x2="50" y2="86" />
+            <line class="sweep-h" x1="46" y1="50" x2="54" y2="50" stroke-width="2.4" />
+            <line class="sweep-v" x1="50" y1="46" x2="50" y2="54" stroke-width="2.4" />
+            <circle cx="50" cy="50" r="1.8" fill="#7ee9ff" stroke="none" />
+          </g>
+        </svg>
+      </div>
+      <div class="chips">
+        <div class="chip sticker face-red"><svg class="reticle r2" viewBox="0 0 100 100"><g class="stroke-cyan glow-cyan" fill="none" stroke-width="1.6" stroke-linecap="round"><line class="dash" x1="14" y1="50" x2="86" y2="50"/><line class="dash" x1="50" y1="14" x2="50" y2="86"/><line class="sweep-h" x1="46" y1="50" x2="54" y2="50" stroke-width="2.4"/><line class="sweep-v" x1="50" y1="46" x2="50" y2="54" stroke-width="2.4"/></g></svg></div>
+        <div class="chip sticker face-yellow"><svg class="reticle r2" viewBox="0 0 100 100"><g class="stroke-cyan glow-cyan" fill="none" stroke-width="1.6" stroke-linecap="round"><line class="dash" x1="14" y1="50" x2="86" y2="50"/><line class="dash" x1="50" y1="14" x2="50" y2="86"/><line class="sweep-h" x1="46" y1="50" x2="54" y2="50" stroke-width="2.4"/><line class="sweep-v" x1="50" y1="46" x2="50" y2="54" stroke-width="2.4"/></g></svg></div>
+        <div class="chip sticker face-blue"><svg class="reticle r2" viewBox="0 0 100 100"><g class="stroke-cyan glow-cyan" fill="none" stroke-width="1.6" stroke-linecap="round"><line class="dash" x1="14" y1="50" x2="86" y2="50"/><line class="dash" x1="50" y1="14" x2="50" y2="86"/><line class="sweep-h" x1="46" y1="50" x2="54" y2="50" stroke-width="2.4"/><line class="sweep-v" x1="50" y1="46" x2="50" y2="54" stroke-width="2.4"/></g></svg></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 3. Ink brush ============ -->
+  <div class="card">
+    <div class="kicker">Option 03</div>
+    <h2>Ink brush / gestural</h2>
+    <p>Tapered brush strokes in warm off-white, painterly ends. Suggests martial-arts / rhythm-game / calligraphy energy — the piece is a canvas, the reticle is a mark. Less "UI overlay," more character.</p>
+    <div class="stage">
+      <div class="big sticker face-red">
+        <svg class="reticle" viewBox="0 0 100 100">
+          <!-- horizontal brush stroke: filled shape with tapered ends -->
+          <path class="r3-ink" d="M 15 50 Q 25 47 50 46 Q 75 47 85 50 Q 75 53 50 54 Q 25 53 15 50 Z" />
+          <path class="r3-ink" d="M 50 15 Q 47 25 46 50 Q 47 75 50 85 Q 53 75 54 50 Q 53 25 50 15 Z" />
+        </svg>
+      </div>
+      <div class="chips">
+        <div class="chip sticker face-red"><svg class="reticle" viewBox="0 0 100 100"><path class="r3-ink small" d="M 15 50 Q 25 47 50 46 Q 75 47 85 50 Q 75 53 50 54 Q 25 53 15 50 Z"/><path class="r3-ink small" d="M 50 15 Q 47 25 46 50 Q 47 75 50 85 Q 53 75 54 50 Q 53 25 50 15 Z"/></svg></div>
+        <div class="chip sticker face-yellow"><svg class="reticle" viewBox="0 0 100 100"><path fill="#1a1005" opacity="0.75" d="M 15 50 Q 25 47 50 46 Q 75 47 85 50 Q 75 53 50 54 Q 25 53 15 50 Z"/><path fill="#1a1005" opacity="0.75" d="M 50 15 Q 47 25 46 50 Q 47 75 50 85 Q 53 75 54 50 Q 53 25 50 15 Z"/></svg></div>
+        <div class="chip sticker face-blue"><svg class="reticle" viewBox="0 0 100 100"><path class="r3-ink small" d="M 15 50 Q 25 47 50 46 Q 75 47 85 50 Q 75 53 50 54 Q 25 53 15 50 Z"/><path class="r3-ink small" d="M 50 15 Q 47 25 46 50 Q 47 75 50 85 Q 53 75 54 50 Q 53 25 50 15 Z"/></svg></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 4. Arcade arrows ============ -->
+  <div class="card">
+    <div class="kicker">Option 04</div>
+    <h2>Arcade energy arrows</h2>
+    <p>The bars terminate in chevron heads pointing outward on each axis — an explicit "spin here" cue. Chunky, high-contrast, fighting-game / DDR arrow language. Boldest of the six, hardest to ignore.</p>
+    <div class="stage">
+      <div class="big sticker face-red">
+        <svg class="reticle r4" viewBox="0 0 100 100">
+          <g class="fill-cyan glow-cyan">
+            <!-- right arrow -->
+            <polygon class="arrow a1" points="60,46 78,46 78,42 88,50 78,58 78,54 60,54" />
+            <!-- left arrow -->
+            <polygon class="arrow a2" points="40,46 22,46 22,42 12,50 22,58 22,54 40,54" />
+            <!-- up arrow -->
+            <polygon class="arrow a3" points="46,40 46,22 42,22 50,12 58,22 54,22 54,40" />
+            <!-- down arrow -->
+            <polygon class="arrow a4" points="46,60 46,78 42,78 50,88 58,78 54,78 54,60" />
+            <circle cx="50" cy="50" r="2.4" />
+          </g>
+        </svg>
+      </div>
+      <div class="chips">
+        <div class="chip sticker face-red"><svg class="reticle r4" viewBox="0 0 100 100"><g class="fill-cyan glow-cyan"><polygon class="arrow a1" points="60,46 78,46 78,42 88,50 78,58 78,54 60,54"/><polygon class="arrow a2" points="40,46 22,46 22,42 12,50 22,58 22,54 40,54"/><polygon class="arrow a3" points="46,40 46,22 42,22 50,12 58,22 54,22 54,40"/><polygon class="arrow a4" points="46,60 46,78 42,78 50,88 58,78 54,78 54,60"/></g></svg></div>
+        <div class="chip sticker face-yellow"><svg class="reticle r4" viewBox="0 0 100 100"><g class="fill-cyan glow-cyan"><polygon class="arrow a1" points="60,46 78,46 78,42 88,50 78,58 78,54 60,54"/><polygon class="arrow a2" points="40,46 22,46 22,42 12,50 22,58 22,54 40,54"/><polygon class="arrow a3" points="46,40 46,22 42,22 50,12 58,22 54,22 54,40"/><polygon class="arrow a4" points="46,60 46,78 42,78 50,88 58,78 54,78 54,60"/></g></svg></div>
+        <div class="chip sticker face-blue"><svg class="reticle r4" viewBox="0 0 100 100"><g class="fill-cyan glow-cyan"><polygon class="arrow a1" points="60,46 78,46 78,42 88,50 78,58 78,54 60,54"/><polygon class="arrow a2" points="40,46 22,46 22,42 12,50 22,58 22,54 40,54"/><polygon class="arrow a3" points="46,40 46,22 42,22 50,12 58,22 54,22 54,40"/><polygon class="arrow a4" points="46,60 46,78 42,78 50,88 58,78 54,78 54,60"/></g></svg></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 5. Neon circuit ============ -->
+  <div class="card">
+    <div class="kicker">Option 05</div>
+    <h2>Neon circuit</h2>
+    <p>Thin traces from a central node out to four endpoint nodes. Endpoints have small square "pads." Nodes glow independently on a slow phase. Reads like a PCB or sci-fi rig terminal.</p>
+    <div class="stage">
+      <div class="big sticker face-red">
+        <svg class="reticle r5" viewBox="0 0 100 100">
+          <g class="stroke-cyan glow-cyan" fill="none" stroke-width="1.2">
+            <line x1="50" y1="50" x2="18" y2="50" />
+            <line x1="50" y1="50" x2="82" y2="50" />
+            <line x1="50" y1="50" x2="50" y2="18" />
+            <line x1="50" y1="50" x2="50" y2="82" />
+          </g>
+          <g class="fill-cyan glow-cyan">
+            <rect class="node n1" x="15" y="47" width="6" height="6" rx="1" />
+            <rect class="node n2" x="79" y="47" width="6" height="6" rx="1" />
+            <rect class="node n3" x="47" y="15" width="6" height="6" rx="1" />
+            <rect class="node n4" x="47" y="79" width="6" height="6" rx="1" />
+            <circle cx="50" cy="50" r="3" />
+          </g>
+        </svg>
+      </div>
+      <div class="chips">
+        <div class="chip sticker face-red"><svg class="reticle r5" viewBox="0 0 100 100"><g class="stroke-cyan glow-cyan" fill="none" stroke-width="1.2"><line x1="50" y1="50" x2="18" y2="50"/><line x1="50" y1="50" x2="82" y2="50"/><line x1="50" y1="50" x2="50" y2="18"/><line x1="50" y1="50" x2="50" y2="82"/></g><g class="fill-cyan glow-cyan"><rect x="15" y="47" width="6" height="6" rx="1"/><rect x="79" y="47" width="6" height="6" rx="1"/><rect x="47" y="15" width="6" height="6" rx="1"/><rect x="47" y="79" width="6" height="6" rx="1"/><circle cx="50" cy="50" r="3"/></g></svg></div>
+        <div class="chip sticker face-yellow"><svg class="reticle r5" viewBox="0 0 100 100"><g class="stroke-cyan glow-cyan" fill="none" stroke-width="1.2"><line x1="50" y1="50" x2="18" y2="50"/><line x1="50" y1="50" x2="82" y2="50"/><line x1="50" y1="50" x2="50" y2="18"/><line x1="50" y1="50" x2="50" y2="82"/></g><g class="fill-cyan glow-cyan"><rect x="15" y="47" width="6" height="6" rx="1"/><rect x="79" y="47" width="6" height="6" rx="1"/><rect x="47" y="15" width="6" height="6" rx="1"/><rect x="47" y="79" width="6" height="6" rx="1"/><circle cx="50" cy="50" r="3"/></g></svg></div>
+        <div class="chip sticker face-blue"><svg class="reticle r5" viewBox="0 0 100 100"><g class="stroke-cyan glow-cyan" fill="none" stroke-width="1.2"><line x1="50" y1="50" x2="18" y2="50"/><line x1="50" y1="50" x2="82" y2="50"/><line x1="50" y1="50" x2="50" y2="18"/><line x1="50" y1="50" x2="50" y2="82"/></g><g class="fill-cyan glow-cyan"><rect x="15" y="47" width="6" height="6" rx="1"/><rect x="79" y="47" width="6" height="6" rx="1"/><rect x="47" y="15" width="6" height="6" rx="1"/><rect x="47" y="79" width="6" height="6" rx="1"/><circle cx="50" cy="50" r="3"/></g></svg></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 6. Compass diamond ============ -->
+  <div class="card">
+    <div class="kicker">Option 06</div>
+    <h2>Compass diamond</h2>
+    <p>A slowly-breathing rhombus frame with pips at the four cardinal points and a minimal cross center. Least busy of the set — architectural, elegant. Reads as "compass rose" more than "targeting reticle."</p>
+    <div class="stage">
+      <div class="big sticker face-red">
+        <svg class="reticle r6" viewBox="0 0 100 100">
+          <g class="stroke-cyan glow-cyan" fill="none" stroke-width="1.4">
+            <rect class="frame" x="26" y="26" width="48" height="48" />
+            <line x1="42" y1="50" x2="58" y2="50" />
+            <line x1="50" y1="42" x2="50" y2="58" />
+          </g>
+          <g class="fill-cyan glow-cyan">
+            <circle cx="50" cy="17" r="2" />
+            <circle cx="50" cy="83" r="2" />
+            <circle cx="17" cy="50" r="2" />
+            <circle cx="83" cy="50" r="2" />
+          </g>
+        </svg>
+      </div>
+      <div class="chips">
+        <div class="chip sticker face-red"><svg class="reticle r6" viewBox="0 0 100 100"><g class="stroke-cyan glow-cyan" fill="none" stroke-width="1.4"><rect class="frame" x="26" y="26" width="48" height="48"/><line x1="42" y1="50" x2="58" y2="50"/><line x1="50" y1="42" x2="50" y2="58"/></g><g class="fill-cyan glow-cyan"><circle cx="50" cy="17" r="2"/><circle cx="50" cy="83" r="2"/><circle cx="17" cy="50" r="2"/><circle cx="83" cy="50" r="2"/></g></svg></div>
+        <div class="chip sticker face-yellow"><svg class="reticle r6" viewBox="0 0 100 100"><g class="stroke-cyan glow-cyan" fill="none" stroke-width="1.4"><rect class="frame" x="26" y="26" width="48" height="48"/><line x1="42" y1="50" x2="58" y2="50"/><line x1="50" y1="42" x2="50" y2="58"/></g><g class="fill-cyan glow-cyan"><circle cx="50" cy="17" r="2"/><circle cx="50" cy="83" r="2"/><circle cx="17" cy="50" r="2"/><circle cx="83" cy="50" r="2"/></g></svg></div>
+        <div class="chip sticker face-blue"><svg class="reticle r6" viewBox="0 0 100 100"><g class="stroke-cyan glow-cyan" fill="none" stroke-width="1.4"><rect class="frame" x="26" y="26" width="48" height="48"/><line x1="42" y1="50" x2="58" y2="50"/><line x1="50" y1="42" x2="50" y2="58"/></g><g class="fill-cyan glow-cyan"><circle cx="50" cy="17" r="2"/><circle cx="50" cy="83" r="2"/><circle cx="17" cy="50" r="2"/><circle cx="83" cy="50" r="2"/></g></svg></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  These are 2D CSS/SVG mockups approximating how the reticle overlay would read on a live cube face. The actual implementation in <code>Sticker.tsx</code> lives in Three.js — thin emissive geometry floating just above each sticker top. Any of these can be built with a mix of thin mesh geometry, sprite planes, or SDF textures; complexity ranges from Option 06 (easy) to Option 04 / 05 (needs a few more small meshes per sticker).
+</footer>
+
+</body>
+</html>

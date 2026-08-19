@@ -11,6 +11,8 @@ import {
   STICKER_THICKNESS,
 } from '../../cube/geometry';
 import { currentFlashIntensity } from '../../interaction/commitFlash';
+import { getReticleTexture, resolveReticleStyle } from '../../cube/reticleStyles';
+import { useGameStore } from '../../store/gameStore';
 
 interface StickerProps {
   side: StickerSide;
@@ -21,24 +23,14 @@ interface StickerProps {
 const HALF = CUBIE_SIZE / 2;
 const SIZE = CUBIE_SIZE - STICKER_INSET * 2;
 
-const TRACELINE_LENGTH = SIZE * 0.78;
-const TRACELINE_THICKNESS = SIZE * 0.11;
-const TRACELINE_HEIGHT = 0.02;
 /**
- * Sticker top surface sits at STICKER_THICKNESS/2 above the group origin.
- * Tracelines float just above that with a small gap so they don't z-fight.
+ * Reticle plane sits just above the sticker's top surface. Sticker top is at
+ * STICKER_THICKNESS / 2; a tiny gap keeps them from z-fighting.
  */
-const TRACELINE_Y_H = STICKER_THICKNESS / 2 + TRACELINE_HEIGHT / 2 + 0.001;
-/**
- * The vertical bar sits 0.006 higher than the horizontal so they don't
- * occupy the same depth values at the intersection. Two coincident bars
- * z-fight and both go invisible; a tiny y-offset resolves it and is not
- * noticeable at this render distance.
- */
-const TRACELINE_Y_V = TRACELINE_Y_H + 0.006;
-const TRACELINE_COLOR_HEX = '#7ee9ff';
-const TRACELINE_EMISSIVE_BASE = 1.6;
-const TRACELINE_EMISSIVE_PEAK = 4.2;
+const RETICLE_Y = STICKER_THICKNESS / 2 + 0.002;
+const RETICLE_COLOR_HEX = '#7ee9ff';
+const RETICLE_EMISSIVE_BASE = 1.6;
+const RETICLE_EMISSIVE_PEAK = 4.2;
 
 const PLACEMENT: Record<
   StickerSide,
@@ -59,8 +51,10 @@ export function Sticker({ side, highlighted = false }: StickerProps) {
   const { roughness, metalness, envMapIntensity } = theme.material;
   const color = useMemo(() => new THREE.Color(hex), [hex]);
   const materialRef = useRef<THREE.MeshStandardMaterial>(null);
-  const traceHRef = useRef<THREE.MeshStandardMaterial>(null);
-  const traceVRef = useRef<THREE.MeshStandardMaterial>(null);
+  const reticleRef = useRef<THREE.MeshStandardMaterial>(null);
+
+  const styleId = useGameStore((s) => resolveReticleStyle(s.settings.reticleStyle));
+  const reticleTexture = useMemo(() => getReticleTexture(styleId), [styleId]);
 
   useFrame(({ clock }) => {
     const mat = materialRef.current;
@@ -75,12 +69,10 @@ export function Sticker({ side, highlighted = false }: StickerProps) {
     }
     const flash = currentFlashIntensity(performance.now());
     const target =
-      TRACELINE_EMISSIVE_BASE +
-      (TRACELINE_EMISSIVE_PEAK - TRACELINE_EMISSIVE_BASE) * flash;
-    const th = traceHRef.current;
-    if (th && th.emissiveIntensity !== target) th.emissiveIntensity = target;
-    const tv = traceVRef.current;
-    if (tv && tv.emissiveIntensity !== target) tv.emissiveIntensity = target;
+      RETICLE_EMISSIVE_BASE +
+      (RETICLE_EMISSIVE_PEAK - RETICLE_EMISSIVE_BASE) * flash;
+    const rm = reticleRef.current;
+    if (rm && rm.emissiveIntensity !== target) rm.emissiveIntensity = target;
   });
 
   return (
@@ -99,31 +91,20 @@ export function Sticker({ side, highlighted = false }: StickerProps) {
           envMapIntensity={envMapIntensity}
         />
       </RoundedBox>
-      <mesh position={[0, TRACELINE_Y_H, 0]}>
-        <boxGeometry
-          args={[TRACELINE_LENGTH, TRACELINE_HEIGHT, TRACELINE_THICKNESS]}
-        />
+      <mesh position={[0, RETICLE_Y, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[SIZE, SIZE]} />
         <meshStandardMaterial
-          ref={traceHRef}
-          color={TRACELINE_COLOR_HEX}
-          emissive={TRACELINE_COLOR_HEX}
-          emissiveIntensity={TRACELINE_EMISSIVE_BASE}
-          roughness={0.3}
-          metalness={0.1}
-          toneMapped={false}
-        />
-      </mesh>
-      <mesh position={[0, TRACELINE_Y_V, 0]}>
-        <boxGeometry
-          args={[TRACELINE_THICKNESS, TRACELINE_HEIGHT, TRACELINE_LENGTH]}
-        />
-        <meshStandardMaterial
-          ref={traceVRef}
-          color={TRACELINE_COLOR_HEX}
-          emissive={TRACELINE_COLOR_HEX}
-          emissiveIntensity={TRACELINE_EMISSIVE_BASE}
-          roughness={0.3}
-          metalness={0.1}
+          key={styleId}
+          ref={reticleRef}
+          color="#000000"
+          emissive={RETICLE_COLOR_HEX}
+          emissiveMap={reticleTexture}
+          emissiveIntensity={RETICLE_EMISSIVE_BASE}
+          alphaMap={reticleTexture}
+          transparent
+          depthWrite={false}
+          roughness={0.4}
+          metalness={0}
           toneMapped={false}
         />
       </mesh>

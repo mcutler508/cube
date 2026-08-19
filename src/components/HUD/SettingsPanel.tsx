@@ -3,6 +3,8 @@ import { useGameStore } from '../../store/gameStore';
 import type { Settings } from '../../game/persistence';
 import { THEMES } from '../../cube/themes';
 import { ThemePreview } from './ThemePreview';
+import { RETICLE_STYLES, resolveReticleStyle } from '../../cube/reticleStyles';
+import { ReticlePreview } from './ReticlePreview';
 
 /**
  * In-level settings overlay. Opened by the gear icon on the top HUD, closed
@@ -66,6 +68,19 @@ export function SettingsPanel() {
                 theme={theme}
                 selected={settings.themeId === theme.id}
                 onSelect={() => setSetting('themeId', theme.id)}
+              />
+            ))}
+          </div>
+        </Section>
+
+        <Section title="Direction indicator">
+          <div className="grid grid-cols-3 gap-2 p-2">
+            {RETICLE_STYLES.map((style) => (
+              <ReticlePreview
+                key={style.id}
+                style={style}
+                selected={resolveReticleStyle(settings.reticleStyle) === style.id}
+                onSelect={() => setSetting('reticleStyle', style.id)}
               />
             ))}
           </div>

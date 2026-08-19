@@ -196,14 +196,20 @@ export function GestureLayer({ children }: { children: ReactNode }) {
         if (pts.length < 2) return;
         const cx = (pts[0].x + pts[1].x) / 2;
         const cy = (pts[0].y + pts[1].y) / 2;
-        viewOrientation.updateDrag((cx - s.lastX) * ORBIT_SENSITIVITY);
+        viewOrientation.updateDrag(
+          (cx - s.lastX) * ORBIT_SENSITIVITY,
+          (cy - s.lastY) * ORBIT_SENSITIVITY,
+        );
         s.lastX = cx;
         s.lastY = cy;
         return;
       }
 
       if (s.kind === 'orbiting' && e.pointerId === s.pointerId) {
-        viewOrientation.updateDrag((e.clientX - s.lastX) * ORBIT_SENSITIVITY);
+        viewOrientation.updateDrag(
+          (e.clientX - s.lastX) * ORBIT_SENSITIVITY,
+          (e.clientY - s.lastY) * ORBIT_SENSITIVITY,
+        );
         s.lastX = e.clientX;
         s.lastY = e.clientY;
         return;

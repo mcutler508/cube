@@ -12,14 +12,38 @@ import * as THREE from 'three';
  * The controller supports a live yaw drag (during which the view follows the
  * finger 1:1) and eases smoothly to the target quaternion on release. A
  * flip() call is a discrete 180° animation between the two vertical poles.
+ *
+ * A live pitch drag is also allowed, but clamped to a shallow ±45° peek so
+ * the player can nudge to glance at the top or bottom face without ever
+ * fully disorienting the view. On release, a firm nudge past the halfway
+ * mark commits (equivalent to pressing flip); a light nudge springs back.
  */
 
 type State =
   | { kind: 'idle' }
-  | { kind: 'dragging'; baseQuat: THREE.Quaternion; yawDelta: number };
+  | {
+      kind: 'dragging';
+      baseQuat: THREE.Quaternion;
+      yawDelta: number;
+      pitchDelta: number;
+    };
 
 const FLIP_AXIS = new THREE.Vector3(1, 0, 0);
 const YAW_AXIS = new THREE.Vector3(0, 1, 0);
+const PITCH_AXIS = new THREE.Vector3(1, 0, 0);
+/**
+ * Max live tilt while the finger is held — a "half reveal" of the top or
+ * bottom face. Keeps the guardrailed feel: you can peek but never fully
+ * disorient the view mid-drag.
+ */
+const MAX_PITCH_TILT = Math.PI / 4; // 45°
+/**
+ * Past this much tilt on release, snap forward to the newly-revealed pole
+ * (equivalent to pressing the flip button). Below it, spring back to the
+ * current pole. Sitting exactly at MAX_PITCH_TILT/2 makes the max-held
+ * peek land squarely on "commit."
+ */
+const PITCH_COMMIT_THRESHOLD = MAX_PITCH_TILT / 2;
 /**
  * Exponential-approach rate for easing the current quaternion toward the
  * target after a drag release or a flip. Roughly, `1 / EASE_RATE` seconds is
@@ -48,18 +72,26 @@ class ViewOrientationController {
       kind: 'dragging',
       baseQuat: this.currentQuat.clone(),
       yawDelta: 0,
+      pitchDelta: 0,
     };
   }
 
-  updateDrag(deltaYawRadians: number): void {
+  updateDrag(deltaYawRadians: number, deltaPitchRadians = 0): void {
     if (this.state.kind !== 'dragging') return;
     this.state.yawDelta += deltaYawRadians;
+    this.state.pitchDelta = Math.max(
+      -MAX_PITCH_TILT,
+      Math.min(MAX_PITCH_TILT, this.state.pitchDelta + deltaPitchRadians),
+    );
   }
 
   endDrag(): void {
     if (this.state.kind !== 'dragging') return;
     const stepsFromBase = Math.round(this.state.yawDelta / (Math.PI / 2));
     this.yawIndex = ((((this.yawIndex + stepsFromBase) % 4) + 4) % 4) as 0 | 1 | 2 | 3;
+    if (Math.abs(this.state.pitchDelta) >= PITCH_COMMIT_THRESHOLD) {
+      this.flipped = !this.flipped;
+    }
     this.state = { kind: 'idle' };
     this.recomputeTarget();
   }
@@ -92,6 +124,11 @@ class ViewOrientationController {
     return this.state.kind === 'dragging' ? this.state.yawDelta : 0;
   }
 
+  /** Accumulated pitch tilt in radians while a drag is in progress. */
+  getPitchDelta(): number {
+    return this.state.kind === 'dragging' ? this.state.pitchDelta : 0;
+  }
+
   /** True while the current quaternion is still easing toward its target. */
   isAnimating(): boolean {
     if (this.state.kind === 'dragging') return true;
@@ -100,10 +137,15 @@ class ViewOrientationController {
 
   tick(deltaSeconds: number, out: THREE.Quaternion): void {
     if (this.state.kind === 'dragging') {
-      // Live drag: apply accumulated yaw around world-Y on top of the base
-      // orientation captured at drag start (premultiply for world-axis).
+      // Live drag: apply accumulated yaw around world-Y and pitch around
+      // world-X on top of the base orientation captured at drag start
+      // (premultiply for world-axis rotations).
       this.tmpA.setFromAxisAngle(YAW_AXIS, this.state.yawDelta);
-      this.currentQuat.copy(this.state.baseQuat).premultiply(this.tmpA);
+      this.tmpB.setFromAxisAngle(PITCH_AXIS, this.state.pitchDelta);
+      this.currentQuat
+        .copy(this.state.baseQuat)
+        .premultiply(this.tmpA)
+        .premultiply(this.tmpB);
     } else {
       const t = 1 - Math.exp(-EASE_RATE * Math.max(0, deltaSeconds));
       this.currentQuat.slerp(this.targetQuat, t);
