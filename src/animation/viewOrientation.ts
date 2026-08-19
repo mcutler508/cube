@@ -83,6 +83,15 @@ class ViewOrientationController {
     return this.state.kind === 'dragging';
   }
 
+  /**
+   * Accumulated yaw drag in radians while a drag is in progress. Returns 0
+   * when idle. Purely for visual affordances (a knob that follows the finger)
+   * that want to mirror the drag without owning any input themselves.
+   */
+  getDragDelta(): number {
+    return this.state.kind === 'dragging' ? this.state.yawDelta : 0;
+  }
+
   /** True while the current quaternion is still easing toward its target. */
   isAnimating(): boolean {
     if (this.state.kind === 'dragging') return true;

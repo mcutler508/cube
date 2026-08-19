@@ -35,13 +35,7 @@ export function FlipButton() {
       type="button"
       onClick={() => viewOrientation.flip()}
       aria-label={flipped ? 'Flip to white on top' : 'Flip to yellow on top'}
-      className="pointer-events-auto absolute z-20 flex items-center justify-center rounded-full bg-white/8 backdrop-blur-md ring-1 ring-white/15 shadow-lg shadow-black/40 transition-transform active:scale-90"
-      style={{
-        right: 'max(env(safe-area-inset-right), 1rem)',
-        bottom: '1rem',
-        width: '3.5rem',
-        height: '3.5rem',
-      }}
+      className="pointer-events-auto flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white/8 backdrop-blur-md ring-1 ring-white/15 shadow-lg shadow-black/40 transition-transform active:scale-90"
     >
       <div className="flex flex-col items-center justify-center gap-[3px]">
         <div

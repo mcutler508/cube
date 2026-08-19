@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Cube · Theme Explorations</title>
+<style>
+  /* ---------- Page shell ---------- */
+  :root {
+    --page-bg: #08080b;
+    --page-fg: #f2f2f7;
+    --muted: #8a8a97;
+    --line: #1c1c24;
+    --card: #0d0d12;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--page-bg);
+    color: var(--page-fg);
+    padding: 48px 32px 96px;
+  }
+  header { max-width: 1320px; margin: 0 auto 32px; }
+  h1 {
+    font: 600 30px/1.15 ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: -0.02em; margin: 0 0 8px;
+  }
+  header p { color: var(--muted); margin: 0; max-width: 62ch; }
+
+  .grid {
+    max-width: 1320px; margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 28px;
+  }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .card-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding: 22px 24px 8px;
+  }
+  .card-head h2 {
+    margin: 0;
+    font: 600 20px/1.2 ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: -0.01em;
+  }
+  .kicker {
+    font: 500 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted);
+  }
+  .card-sub { padding: 0 24px 18px; color: var(--muted); font-size: 13px; }
+
+  /* ---------- Stage ---------- */
+  .stage {
+    position: relative;
+    padding: 60px 32px 72px;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 440px;
+    perspective: 1600px;
+    overflow: hidden;
+  }
+  /* Ground shadow beneath the cube */
+  .stage::after {
+    content: "";
+    position: absolute;
+    left: 50%; bottom: 34px;
+    width: 320px; height: 34px;
+    transform: translateX(-50%);
+    border-radius: 50%;
+    background: radial-gradient(ellipse, rgba(0,0,0,.55) 0%, rgba(0,0,0,0) 70%);
+    filter: blur(2px);
+    pointer-events: none;
+  }
+
+  /* ---------- 3D cube ---------- */
+  .cube3d {
+    position: relative;
+    width: 264px; height: 264px;
+    transform-style: preserve-3d;
+    transform: rotateX(-26deg) rotateY(-34deg);
+  }
+  .face3d {
+    position: absolute; inset: 0;
+    width: 264px; height: 264px;
+    backface-visibility: hidden;
+  }
+  .face-top   { transform: rotateX(90deg) translateZ(132px); filter: brightness(1.08); }
+  .face-front { transform: translateZ(132px); }
+  .face-right { transform: rotateY(90deg) translateZ(132px); filter: brightness(0.68) contrast(1.05); }
+
+  .face {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: var(--sticker-gap, 8px);
+    width: 100%; height: 100%;
+    padding: var(--face-pad, 10px);
+  }
+  .sticker {
+    border-radius: var(--sticker-radius, 10px);
+    transition: filter .15s ease;
+  }
+  .sticker:hover { filter: brightness(1.18) saturate(1.1); }
+
+  /* ---------- Palette strip ---------- */
+  .palette {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 14px;
+    padding: 18px 24px 24px;
+    border-top: 1px solid var(--line);
+    background: rgba(255,255,255,.015);
+  }
+  .swatch { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .swatch-chip { width: 48px; height: 48px; border-radius: 10px; }
+  .swatch-label {
+    font: 500 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted);
+  }
+
+  footer {
+    max-width: 1320px; margin: 40px auto 0;
+    color: var(--muted); font-size: 12px;
+  }
+
+  /* =========================================================
+     THEME 1 — GLOSSY PLASTIC
+     Deep saturated color, sharp specular ribbon, tight dark seams.
+     ========================================================= */
+  .t-plastic .stage {
+    background:
+      radial-gradient(ellipse at 30% 15%, #ffffff 0%, #eef1f7 50%, #c8cdd8 100%);
+  }
+  .t-plastic .stage::after { background: radial-gradient(ellipse, rgba(30,35,50,.35), transparent 70%); }
+
+  .t-plastic .face3d {
+    background: #111114;
+    border-radius: 16px;
+    box-shadow:
+      inset 0 0 0 1px #000,
+      0 40px 60px -24px rgba(20,25,45,.5);
+  }
+  .t-plastic .face { --sticker-gap: 6px; --face-pad: 8px; }
+  .t-plastic .sticker {
+    --c: #ea3a3a;
+    --sticker-radius: 8px;
+    background:
+      /* thin bright specular ribbon at top */
+      linear-gradient(180deg, rgba(255,255,255,.9) 0%, rgba(255,255,255,.35) 8%, rgba(255,255,255,0) 22%),
+      /* subtle bottom darken */
+      linear-gradient(180deg, transparent 60%, rgba(0,0,0,.25) 100%),
+      /* pure vibrant fill */
+      var(--c);
+    box-shadow:
+      inset 0 0 0 1px rgba(0,0,0,.35),
+      inset 0 -2px 4px rgba(0,0,0,.25),
+      0 1px 0 rgba(255,255,255,.15);
+  }
+  .plastic-r { --c: #ee1c25; }
+  .plastic-o { --c: #ff7a00; }
+  .plastic-y { --c: #ffd400; }
+  .plastic-g { --c: #00a651; }
+  .plastic-b { --c: #0057ff; }
+  .plastic-w { --c: #f6f7fb; }
+
+  .t-plastic .swatch-chip {
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.9) 0%, rgba(255,255,255,.35) 8%, rgba(255,255,255,0) 22%),
+      linear-gradient(180deg, transparent 60%, rgba(0,0,0,.25) 100%),
+      var(--c);
+    box-shadow:
+      inset 0 0 0 1px rgba(0,0,0,.3),
+      inset 0 -2px 4px rgba(0,0,0,.25),
+      0 6px 10px -4px rgba(20,25,45,.4);
+  }
+
+  /* =========================================================
+     THEME 2 — NEON GLASS FLOOR
+     Backlit translucent tiles, real bloom, dark seams between.
+     ========================================================= */
+  .t-glass .stage {
+    background:
+      radial-gradient(ellipse at 50% 30%, #1a1f3a 0%, #05060c 65%),
+      #000;
+  }
+  .t-glass .stage::after { background: radial-gradient(ellipse, rgba(60,120,255,.35), transparent 70%); filter: blur(6px); }
+
+  .t-glass .face3d {
+    background: #000;
+    border-radius: 2px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.05);
+  }
+  .t-glass .face { --sticker-gap: 4px; --face-pad: 4px; }
+  .t-glass .sticker {
+    --c: #ff2f8a;
+    --sticker-radius: 2px;
+    background:
+      linear-gradient(155deg, rgba(255,255,255,.45) 0%, rgba(255,255,255,0) 40%),
+      radial-gradient(ellipse at 50% 100%, color-mix(in srgb, var(--c) 55%, #000) 0%, var(--c) 45%, color-mix(in srgb, var(--c) 92%, #fff) 100%);
+    box-shadow:
+      inset 0 0 0 1px rgba(255,255,255,.35),
+      inset 0 0 18px rgba(255,255,255,.22),
+      0 0 14px color-mix(in srgb, var(--c) 80%, transparent),
+      0 0 34px color-mix(in srgb, var(--c) 55%, transparent),
+      0 0 68px color-mix(in srgb, var(--c) 30%, transparent);
+  }
+  .glass-r { --c: #ff2a5c; }
+  .glass-o { --c: #ff8a1a; }
+  .glass-y { --c: #ffd93b; }
+  .glass-g { --c: #00ffa8; }
+  .glass-b { --c: #00b8ff; }
+  .glass-w { --c: #d9e6ff; }
+
+  .t-glass .swatch-chip {
+    border-radius: 2px;
+    background:
+      linear-gradient(155deg, rgba(255,255,255,.45) 0%, rgba(255,255,255,0) 40%),
+      radial-gradient(ellipse at 50% 100%, color-mix(in srgb, var(--c) 55%, #000) 0%, var(--c) 45%, color-mix(in srgb, var(--c) 92%, #fff) 100%);
+    box-shadow:
+      inset 0 0 0 1px rgba(255,255,255,.35),
+      inset 0 0 16px rgba(255,255,255,.2),
+      0 0 14px color-mix(in srgb, var(--c) 80%, transparent),
+      0 0 32px color-mix(in srgb, var(--c) 50%, transparent);
+  }
+
+  /* =========================================================
+     THEME 3 — AMBER MOSAIC
+     Rich warm glass, hot spec highlight, refracted edge glow.
+     ========================================================= */
+  .t-mosaic .stage {
+    background:
+      radial-gradient(ellipse at 40% 25%, #3a1e10 0%, #120806 65%),
+      #060403;
+  }
+  .t-mosaic .stage::after { background: radial-gradient(ellipse, rgba(255,140,40,.4), transparent 70%); filter: blur(4px); }
+
+  .t-mosaic .face3d {
+    background: #050302;
+    border-radius: 4px;
+    box-shadow: inset 0 0 0 1px rgba(255, 190, 100, .1);
+  }
+  .t-mosaic .face { --sticker-gap: 3px; --face-pad: 4px; }
+  .t-mosaic .sticker {
+    --c: #ff8f1c;
+    --sticker-radius: 3px;
+    background:
+      /* hot spec */
+      linear-gradient(160deg, rgba(255,255,255,.6) 0%, rgba(255,255,255,0) 30%),
+      /* body */
+      linear-gradient(180deg, color-mix(in srgb, var(--c) 90%, #fff) 0%, var(--c) 40%, color-mix(in srgb, var(--c) 40%, #000) 100%);
+    box-shadow:
+      inset 0 0 0 1px rgba(255,255,255,.22),
+      inset 0 -6px 12px rgba(0,0,0,.4),
+      0 0 12px color-mix(in srgb, var(--c) 55%, transparent),
+      0 0 28px color-mix(in srgb, var(--c) 25%, transparent);
+  }
+  .mosaic-r { --c: #ff5a2c; }
+  .mosaic-o { --c: #ffa726; }
+  .mosaic-y { --c: #ffd54a; }
+  .mosaic-g { --c: #26c6b8; }
+  .mosaic-b { --c: #4a6fff; }
+  .mosaic-w { --c: #d4b8ff; }
+
+  .t-mosaic .swatch-chip {
+    border-radius: 3px;
+    background:
+      linear-gradient(160deg, rgba(255,255,255,.6) 0%, rgba(255,255,255,0) 30%),
+      linear-gradient(180deg, color-mix(in srgb, var(--c) 90%, #fff) 0%, var(--c) 40%, color-mix(in srgb, var(--c) 40%, #000) 100%);
+    box-shadow:
+      inset 0 0 0 1px rgba(255,255,255,.22),
+      inset 0 -6px 12px rgba(0,0,0,.4),
+      0 0 14px color-mix(in srgb, var(--c) 55%, transparent);
+  }
+
+  /* =========================================================
+     THEME 4 — NEON STACKED
+     Flat vibrant tiles floating on stacked halos, big radial glow.
+     ========================================================= */
+  .t-stacked .stage {
+    background:
+      radial-gradient(ellipse at 50% 35%, #1a1a24 0%, #050508 60%),
+      #000;
+  }
+  .t-stacked .stage::after {
+    width: 380px; height: 44px;
+    background: radial-gradient(ellipse, rgba(53,240,162,.35), transparent 70%);
+    filter: blur(8px);
+  }
+
+  .t-stacked .face3d { background: transparent; }
+  .t-stacked .face { --sticker-gap: 12px; --face-pad: 10px; }
+  .t-stacked .sticker {
+    --c: #35f0a2;
+    --sticker-radius: 8px;
+    background: var(--c);
+    box-shadow:
+      /* bright edge */
+      0 0 0 2px color-mix(in srgb, var(--c) 70%, #fff),
+      /* halo rings */
+      0 0 0 6px color-mix(in srgb, var(--c) 35%, transparent),
+      0 0 0 10px color-mix(in srgb, var(--c) 15%, transparent),
+      /* bloom */
+      0 0 22px color-mix(in srgb, var(--c) 75%, transparent),
+      0 0 60px color-mix(in srgb, var(--c) 40%, transparent);
+  }
+  .stacked-r { --c: #ff2a5c; }
+  .stacked-o { --c: #ff7a1e; }
+  .stacked-y { --c: #ffd21f; }
+  .stacked-g { --c: #35f0a2; }
+  .stacked-b { --c: #2fb8ff; }
+  .stacked-w { --c: #e8e8f4; }
+
+  .t-stacked .swatch-chip {
+    background: var(--c);
+    border-radius: 8px;
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, var(--c) 70%, #fff),
+      0 0 0 5px color-mix(in srgb, var(--c) 30%, transparent),
+      0 0 22px color-mix(in srgb, var(--c) 70%, transparent),
+      0 0 44px color-mix(in srgb, var(--c) 35%, transparent);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Cube · Theme Explorations</h1>
+  <p>Four visual directions for the cube. Each card shows an isometric 3&times;3
+     cube (top / front / right faces, with real per-face lighting) and a palette
+     strip of all six theme colors mapped to Up / Down / Front / Back / Left / Right
+     — the same face roles as <code>src/cube/colors.ts</code>.</p>
+</header>
+
+<main class="grid">
+
+  <!-- =============== THEME 1 · GLOSSY PLASTIC =============== -->
+  <section class="card t-plastic">
+    <div class="card-head">
+      <h2>Glossy Plastic</h2>
+      <span class="kicker">Theme 01 · Light</span>
+    </div>
+    <p class="card-sub">Deep saturated stickers, a hard specular ribbon along the top, tight black seams. Physical, tactile, unmistakably a Rubik's cube.</p>
+    <div class="stage">
+      <div class="cube3d">
+        <div class="face3d face-top">
+          <div class="face">
+            <div class="sticker plastic-w"></div><div class="sticker plastic-w"></div><div class="sticker plastic-w"></div>
+            <div class="sticker plastic-w"></div><div class="sticker plastic-w"></div><div class="sticker plastic-w"></div>
+            <div class="sticker plastic-w"></div><div class="sticker plastic-w"></div><div class="sticker plastic-w"></div>
+          </div>
+        </div>
+        <div class="face3d face-front">
+          <div class="face">
+            <div class="sticker plastic-g"></div><div class="sticker plastic-g"></div><div class="sticker plastic-g"></div>
+            <div class="sticker plastic-g"></div><div class="sticker plastic-g"></div><div class="sticker plastic-g"></div>
+            <div class="sticker plastic-g"></div><div class="sticker plastic-g"></div><div class="sticker plastic-g"></div>
+          </div>
+        </div>
+        <div class="face3d face-right">
+          <div class="face">
+            <div class="sticker plastic-r"></div><div class="sticker plastic-r"></div><div class="sticker plastic-r"></div>
+            <div class="sticker plastic-r"></div><div class="sticker plastic-r"></div><div class="sticker plastic-r"></div>
+            <div class="sticker plastic-r"></div><div class="sticker plastic-r"></div><div class="sticker plastic-r"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="palette">
+      <div class="swatch"><div class="swatch-chip plastic-w"></div><span class="swatch-label">Up</span></div>
+      <div class="swatch"><div class="swatch-chip plastic-y"></div><span class="swatch-label">Down</span></div>
+      <div class="swatch"><div class="swatch-chip plastic-g"></div><span class="swatch-label">Front</span></div>
+      <div class="swatch"><div class="swatch-chip plastic-b"></div><span class="swatch-label">Back</span></div>
+      <div class="swatch"><div class="swatch-chip plastic-o"></div><span class="swatch-label">Left</span></div>
+      <div class="swatch"><div class="swatch-chip plastic-r"></div><span class="swatch-label">Right</span></div>
+    </div>
+  </section>
+
+  <!-- =============== THEME 2 · NEON GLASS FLOOR =============== -->
+  <section class="card t-glass">
+    <div class="card-head">
+      <h2>Neon Glass Floor</h2>
+      <span class="kicker">Theme 02 · Dark</span>
+    </div>
+    <p class="card-sub">Backlit translucent tiles bleeding light into the black seams around them. Nightclub-floor drama — every match feels like a strobe.</p>
+    <div class="stage">
+      <div class="cube3d">
+        <div class="face3d face-top">
+          <div class="face">
+            <div class="sticker glass-w"></div><div class="sticker glass-w"></div><div class="sticker glass-w"></div>
+            <div class="sticker glass-w"></div><div class="sticker glass-w"></div><div class="sticker glass-w"></div>
+            <div class="sticker glass-w"></div><div class="sticker glass-w"></div><div class="sticker glass-w"></div>
+          </div>
+        </div>
+        <div class="face3d face-front">
+          <div class="face">
+            <div class="sticker glass-g"></div><div class="sticker glass-g"></div><div class="sticker glass-g"></div>
+            <div class="sticker glass-g"></div><div class="sticker glass-g"></div><div class="sticker glass-g"></div>
+            <div class="sticker glass-g"></div><div class="sticker glass-g"></div><div class="sticker glass-g"></div>
+          </div>
+        </div>
+        <div class="face3d face-right">
+          <div class="face">
+            <div class="sticker glass-r"></div><div class="sticker glass-r"></div><div class="sticker glass-r"></div>
+            <div class="sticker glass-r"></div><div class="sticker glass-r"></div><div class="sticker glass-r"></div>
+            <div class="sticker glass-r"></div><div class="sticker glass-r"></div><div class="sticker glass-r"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="palette">
+      <div class="swatch"><div class="swatch-chip glass-w"></div><span class="swatch-label">Up</span></div>
+      <div class="swatch"><div class="swatch-chip glass-y"></div><span class="swatch-label">Down</span></div>
+      <div class="swatch"><div class="swatch-chip glass-g"></div><span class="swatch-label">Front</span></div>
+      <div class="swatch"><div class="swatch-chip glass-b"></div><span class="swatch-label">Back</span></div>
+      <div class="swatch"><div class="swatch-chip glass-o"></div><span class="swatch-label">Left</span></div>
+      <div class="swatch"><div class="swatch-chip glass-r"></div><span class="swatch-label">Right</span></div>
+    </div>
+  </section>
+
+  <!-- =============== THEME 3 · AMBER MOSAIC =============== -->
+  <section class="card t-mosaic">
+    <div class="card-head">
+      <h2>Amber Mosaic</h2>
+      <span class="kicker">Theme 03 · Warm</span>
+    </div>
+    <p class="card-sub">Rich warm-glass palette — amber, honey, teal, deep blue, violet — with hot specular highlights and warm edge glow. Grown-up, premium, cinematic.</p>
+    <div class="stage">
+      <div class="cube3d">
+        <div class="face3d face-top">
+          <div class="face">
+            <div class="sticker mosaic-w"></div><div class="sticker mosaic-w"></div><div class="sticker mosaic-w"></div>
+            <div class="sticker mosaic-w"></div><div class="sticker mosaic-w"></div><div class="sticker mosaic-w"></div>
+            <div class="sticker mosaic-w"></div><div class="sticker mosaic-w"></div><div class="sticker mosaic-w"></div>
+          </div>
+        </div>
+        <div class="face3d face-front">
+          <div class="face">
+            <div class="sticker mosaic-g"></div><div class="sticker mosaic-g"></div><div class="sticker mosaic-g"></div>
+            <div class="sticker mosaic-g"></div><div class="sticker mosaic-g"></div><div class="sticker mosaic-g"></div>
+            <div class="sticker mosaic-g"></div><div class="sticker mosaic-g"></div><div class="sticker mosaic-g"></div>
+          </div>
+        </div>
+        <div class="face3d face-right">
+          <div class="face">
+            <div class="sticker mosaic-r"></div><div class="sticker mosaic-r"></div><div class="sticker mosaic-r"></div>
+            <div class="sticker mosaic-r"></div><div class="sticker mosaic-r"></div><div class="sticker mosaic-r"></div>
+            <div class="sticker mosaic-r"></div><div class="sticker mosaic-r"></div><div class="sticker mosaic-r"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="palette">
+      <div class="swatch"><div class="swatch-chip mosaic-w"></div><span class="swatch-label">Up</span></div>
+      <div class="swatch"><div class="swatch-chip mosaic-y"></div><span class="swatch-label">Down</span></div>
+      <div class="swatch"><div class="swatch-chip mosaic-g"></div><span class="swatch-label">Front</span></div>
+      <div class="swatch"><div class="swatch-chip mosaic-b"></div><span class="swatch-label">Back</span></div>
+      <div class="swatch"><div class="swatch-chip mosaic-o"></div><span class="swatch-label">Left</span></div>
+      <div class="swatch"><div class="swatch-chip mosaic-r"></div><span class="swatch-label">Right</span></div>
+    </div>
+  </section>
+
+  <!-- =============== THEME 4 · NEON STACKED =============== -->
+  <section class="card t-stacked">
+    <div class="card-head">
+      <h2>Neon Stacked</h2>
+      <span class="kicker">Theme 04 · Playful</span>
+    </div>
+    <p class="card-sub">Flat neon tiles floating on stacked halo rings against near-black. Synthwave arcade energy — the palette below is the real hero.</p>
+    <div class="stage">
+      <div class="cube3d">
+        <div class="face3d face-top">
+          <div class="face">
+            <div class="sticker stacked-w"></div><div class="sticker stacked-w"></div><div class="sticker stacked-w"></div>
+            <div class="sticker stacked-w"></div><div class="sticker stacked-w"></div><div class="sticker stacked-w"></div>
+            <div class="sticker stacked-w"></div><div class="sticker stacked-w"></div><div class="sticker stacked-w"></div>
+          </div>
+        </div>
+        <div class="face3d face-front">
+          <div class="face">
+            <div class="sticker stacked-g"></div><div class="sticker stacked-g"></div><div class="sticker stacked-g"></div>
+            <div class="sticker stacked-g"></div><div class="sticker stacked-g"></div><div class="sticker stacked-g"></div>
+            <div class="sticker stacked-g"></div><div class="sticker stacked-g"></div><div class="sticker stacked-g"></div>
+          </div>
+        </div>
+        <div class="face3d face-right">
+          <div class="face">
+            <div class="sticker stacked-r"></div><div class="sticker stacked-r"></div><div class="sticker stacked-r"></div>
+            <div class="sticker stacked-r"></div><div class="sticker stacked-r"></div><div class="sticker stacked-r"></div>
+            <div class="sticker stacked-r"></div><div class="sticker stacked-r"></div><div class="sticker stacked-r"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="palette">
+      <div class="swatch"><div class="swatch-chip stacked-w"></div><span class="swatch-label">Up</span></div>
+      <div class="swatch"><div class="swatch-chip stacked-y"></div><span class="swatch-label">Down</span></div>
+      <div class="swatch"><div class="swatch-chip stacked-g"></div><span class="swatch-label">Front</span></div>
+      <div class="swatch"><div class="swatch-chip stacked-b"></div><span class="swatch-label">Back</span></div>
+      <div class="swatch"><div class="swatch-chip stacked-o"></div><span class="swatch-label">Left</span></div>
+      <div class="swatch"><div class="swatch-chip stacked-r"></div><span class="swatch-label">Right</span></div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  Static CSS mockup — three visible faces (top / front / right) per cube, each with
+  independent lighting. Palette maps to <code>src/cube/colors.ts</code> face roles.
+</footer>
+
+</body>
+</html>

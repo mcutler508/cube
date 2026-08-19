@@ -9,7 +9,7 @@ import { ObjectiveBanner } from './components/HUD/ObjectiveBanner';
 import { ObjectiveCompleteOverlay } from './components/HUD/ObjectiveCompleteOverlay';
 import { OnboardingCoach } from './components/HUD/OnboardingCoach';
 import { AlgorithmToast } from './components/HUD/AlgorithmToast';
-import { FlipButton } from './components/HUD/FlipButton';
+import { RotationTray } from './components/HUD/RotationTray';
 import { HintPanel } from './components/HUD/HintPanel';
 import { AlgorithmPalette } from './components/HUD/AlgorithmPalette';
 import { MilestoneChips } from './components/HUD/MilestoneChips';
@@ -79,7 +79,7 @@ export default function App() {
         <FloatingFeedback />
         <AlgorithmToast />
         <OnboardingCoach />
-        <FlipButton />
+        <RotationTray />
         <GameHUD.TopBarSlot />
       </div>
       <div
