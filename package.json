@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "node --version && npm --version && node -e \"require('fs').accessSync('node_modules/.bin/tsc'); console.log('tsc bin present')\" && tsc --version && tsc -b && vite build",
+    "build": "echo STEP1_START && node --version && echo STEP2_NODE_OK && ls node_modules/.bin/tsc && echo STEP3_TSC_BIN_OK && tsc --version && echo STEP4_TSC_RUNS && tsc -b && echo STEP5_TSC_OK && vite build && echo STEP6_VITE_OK",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"
