@@ -12,8 +12,15 @@ import {
   raycastToPlane,
 } from './raycastHelpers';
 import { resolveLayerTurn } from './gestureResolver';
+import { commitFlash } from './commitFlash';
 
-const LAYER_RESOLVE_THRESHOLD_PX = 6;
+/**
+ * How far the finger must travel before a layer turn is *committed* (state
+ * transitions to `dragging-layer` and the resolver locks a specific slice +
+ * axis). Deliberately generous — a small tap-slip should not commit anything.
+ * Once committed, subsequent drag drives the layer's angle 1:1.
+ */
+const LAYER_RESOLVE_THRESHOLD_PX = 22;
 const ORBIT_SENSITIVITY = 0.007; // radians per pixel
 /**
  * World-space drag distance on the touched face that maps to a 90° turn.
@@ -265,6 +272,9 @@ export function GestureLayer({ children }: { children: ReactNode }) {
           stateRef.current = { kind: 'idle' };
           return;
         }
+        // Arcade commit flash — every sticker's traceline briefly pulses so
+        // the player gets an unmistakable "yes, this layer" confirmation.
+        commitFlash.fire();
 
         // Seed the initial angle from the drag we've already accumulated so
         // there's no visual jump on first frame.

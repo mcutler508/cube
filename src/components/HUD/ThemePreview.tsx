@@ -5,6 +5,10 @@ import type { CubeTheme } from '../../cube/themes';
  * Three.js cube — the picker sits in Settings and rendering a real WebGL scene
  * per card would be silly overhead. Instead: a lightweight isometric cube
  * built from CSS 3D transforms, plus a strip of the six theme colors.
+ *
+ * The mini-face styling is derived from the theme's material metrics so
+ * glossy/metallic themes look visibly glassier in the preview than matte
+ * plastic ones — otherwise the two cards read as "same box, different color".
  */
 export function ThemePreview({
   theme,
@@ -48,14 +52,8 @@ export function ThemePreview({
         </span>
       )}
 
-      {/* Mini isometric cube — three visible solid faces, per-face brightness
-          so it reads as 3D instead of a flat isometric drawing. */}
       <div
-        style={{
-          width: CUBE,
-          height: CUBE,
-          perspective: 360,
-        }}
+        style={{ width: CUBE, height: CUBE, perspective: 360 }}
         className="my-1 flex items-center justify-center"
       >
         <div
@@ -67,14 +65,12 @@ export function ThemePreview({
             transform: 'rotateX(-26deg) rotateY(-34deg)',
           }}
         >
-          <MiniFace transform={`rotateX(90deg) translateZ(${HALF}px)`} color={c.up} brightness={1.08} />
-          <MiniFace transform={`translateZ(${HALF}px)`} color={c.front} brightness={1} />
-          <MiniFace transform={`rotateY(90deg) translateZ(${HALF}px)`} color={c.right} brightness={0.68} />
+          <MiniFace transform={`rotateX(90deg) translateZ(${HALF}px)`} color={c.up} brightness={1.1} material={theme.material} />
+          <MiniFace transform={`translateZ(${HALF}px)`} color={c.front} brightness={1} material={theme.material} />
+          <MiniFace transform={`rotateY(90deg) translateZ(${HALF}px)`} color={c.right} brightness={0.66} material={theme.material} />
         </div>
       </div>
 
-      {/* Six-swatch strip so players see the whole palette, not just the
-          three faces visible on the cube preview. */}
       <div className="flex items-center gap-1.5">
         {(['up', 'down', 'front', 'back', 'left', 'right'] as const).map((side) => (
           <span
@@ -95,21 +91,36 @@ function MiniFace({
   transform,
   color,
   brightness,
+  material,
 }: {
   transform: string;
   color: string;
   brightness: number;
+  material: CubeTheme['material'];
 }) {
+  // Derive the face treatment from material metrics:
+  //   - Low roughness → sharp specular ribbon along the top edge.
+  //   - High metalness → cleaner face with almost no dark seam.
+  //   - High roughness / low metalness → matte body, prominent dark seam
+  //     (the classic Rubik's raised-tile look).
+  const glossy = material.roughness < 0.25;
+  const specular = glossy
+    ? 'linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.15) 8%, rgba(255,255,255,0) 22%),'
+    : 'linear-gradient(180deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0) 30%),';
+  const seamShadow = glossy
+    ? 'inset 0 -3px 6px rgba(0,0,0,0.15)'
+    : 'inset 0 -6px 10px rgba(0,0,0,0.35)';
+  const border = glossy ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.45)';
+
   return (
     <div
       style={{
         position: 'absolute',
         inset: 0,
         transform,
-        background: color,
+        background: `${specular} ${color}`,
         filter: `brightness(${brightness})`,
-        boxShadow:
-          'inset 0 0 0 1px rgba(0,0,0,0.4), inset 0 -6px 10px rgba(0,0,0,0.25)',
+        boxShadow: `inset 0 0 0 1px ${border}, ${seamShadow}`,
       }}
     />
   );

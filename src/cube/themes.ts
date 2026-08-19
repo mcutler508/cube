@@ -12,10 +12,20 @@ import { FACE_COLORS, type StickerSide } from './colors';
  */
 export type ThemeId = string;
 
+/** Per-theme material tuning for the sticker's MeshStandardMaterial. Palette
+ *  alone doesn't visually distinguish themes when the surface treatment is
+ *  identical — these knobs give each theme its own tactile feel. */
+export interface ThemeMaterial {
+  roughness: number;
+  metalness: number;
+  envMapIntensity: number;
+}
+
 export interface CubeTheme {
   id: ThemeId;
   name: string;
   colors: Record<StickerSide, string>;
+  material: ThemeMaterial;
 }
 
 export const THEMES: readonly CubeTheme[] = [
@@ -23,6 +33,7 @@ export const THEMES: readonly CubeTheme[] = [
     id: 'classic',
     name: 'Classic',
     colors: { ...FACE_COLORS },
+    material: { roughness: 0.42, metalness: 0.04, envMapIntensity: 0.6 },
   },
   {
     id: 'amber-mosaic',
@@ -35,6 +46,7 @@ export const THEMES: readonly CubeTheme[] = [
       left: '#ffa726',
       right: '#ff5a2c',
     },
+    material: { roughness: 0.15, metalness: 0.6, envMapIntensity: 1.4 },
   },
 ];
 
