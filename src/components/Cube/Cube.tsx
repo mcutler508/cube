@@ -21,7 +21,7 @@ const tmpVec = new THREE.Vector3();
 
 export function Cube() {
   const cubies = useGameStore((s) => s.cubeState.cubies);
-  const hintFace = useGameStore((s) => s.hintMove?.face ?? null);
+  const hintFace = null;
   const cubeStateRef = useRef(useGameStore.getState().cubeState);
   const groupRefs = useRef<Map<number, THREE.Group>>(new Map());
   const animationRef = useRef<RunningAnimation | null>(null);
