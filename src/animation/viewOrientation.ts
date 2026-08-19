@@ -32,18 +32,26 @@ const FLIP_AXIS = new THREE.Vector3(1, 0, 0);
 const YAW_AXIS = new THREE.Vector3(0, 1, 0);
 const PITCH_AXIS = new THREE.Vector3(1, 0, 0);
 /**
- * Max live tilt while the finger is held — a "half reveal" of the top or
- * bottom face. Keeps the guardrailed feel: you can peek but never fully
- * disorient the view mid-drag.
+ * Max live tilt while the finger is held. Asymmetric because the camera
+ * sits ~32° above the cube, so a symmetric peek shows the top generously
+ * but only slivers the bottom. We give the downward peek extra runway to
+ * compensate; the upward peek stays modest because the camera already
+ * favors it.
+ *
+ * Sign convention: positive pitch tilts the geometric top toward the
+ * camera (drag down on screen → peek top). Negative peeks the bottom.
  */
-const MAX_PITCH_TILT = Math.PI / 4; // 45°
+const MAX_PITCH_TILT_UP = Math.PI / 4; // 45°
+const MAX_PITCH_TILT_DOWN = (4 * Math.PI) / 9; // 80°
 /**
  * Past this much tilt on release, snap forward to the newly-revealed pole
- * (equivalent to pressing the flip button). Below it, spring back to the
- * current pole. Sitting exactly at MAX_PITCH_TILT/2 makes the max-held
- * peek land squarely on "commit."
+ * (equivalent to pressing the flip button). Deliberately set very close to
+ * the max on each side: the peek is the primary use case — the player has
+ * to really jam the cube up against the clamp for a commit to trigger.
+ * The flip button remains the intended way to actually flip.
  */
-const PITCH_COMMIT_THRESHOLD = MAX_PITCH_TILT / 2;
+const PITCH_COMMIT_UP = MAX_PITCH_TILT_UP * 0.92;
+const PITCH_COMMIT_DOWN = MAX_PITCH_TILT_DOWN * 0.92;
 /**
  * Exponential-approach rate for easing the current quaternion toward the
  * target after a drag release or a flip. Roughly, `1 / EASE_RATE` seconds is
@@ -80,8 +88,8 @@ class ViewOrientationController {
     if (this.state.kind !== 'dragging') return;
     this.state.yawDelta += deltaYawRadians;
     this.state.pitchDelta = Math.max(
-      -MAX_PITCH_TILT,
-      Math.min(MAX_PITCH_TILT, this.state.pitchDelta + deltaPitchRadians),
+      -MAX_PITCH_TILT_DOWN,
+      Math.min(MAX_PITCH_TILT_UP, this.state.pitchDelta + deltaPitchRadians),
     );
   }
 
@@ -89,7 +97,9 @@ class ViewOrientationController {
     if (this.state.kind !== 'dragging') return;
     const stepsFromBase = Math.round(this.state.yawDelta / (Math.PI / 2));
     this.yawIndex = ((((this.yawIndex + stepsFromBase) % 4) + 4) % 4) as 0 | 1 | 2 | 3;
-    if (Math.abs(this.state.pitchDelta) >= PITCH_COMMIT_THRESHOLD) {
+    const pitch = this.state.pitchDelta;
+    const commitThreshold = pitch >= 0 ? PITCH_COMMIT_UP : PITCH_COMMIT_DOWN;
+    if (Math.abs(pitch) >= commitThreshold) {
       this.flipped = !this.flipped;
     }
     this.state = { kind: 'idle' };

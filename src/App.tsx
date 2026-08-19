@@ -11,7 +11,6 @@ import { OnboardingCoach } from './components/HUD/OnboardingCoach';
 import { AlgorithmToast } from './components/HUD/AlgorithmToast';
 import { RotationTray } from './components/HUD/RotationTray';
 import { HintPanel } from './components/HUD/HintPanel';
-import { AlgorithmPalette } from './components/HUD/AlgorithmPalette';
 import { MilestoneChips } from './components/HUD/MilestoneChips';
 import { SettingsPanel } from './components/HUD/SettingsPanel';
 import { LevelSelect } from './components/LevelSelect/LevelSelect';
@@ -88,7 +87,7 @@ export default function App() {
       >
         <MilestoneChips />
         {showCubeNet && <CubeNet />}
-        <AlgorithmPalette />
+        {/* AlgorithmPalette hidden from UI — functionality preserved in the component and store. */}
         <GameHUD.BottomBarSlot />
       </div>
       <GameHUD.SolvedOverlaySlot />
