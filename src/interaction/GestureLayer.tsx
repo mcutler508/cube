@@ -1,8 +1,9 @@
-import { useThree } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useRef, type ReactNode } from 'react';
 import * as THREE from 'three';
 import { dragController, quarterAngleForMove } from '../animation/dragController';
 import { moveQueue } from '../animation/moveController';
+import { viewOrientation } from '../animation/viewOrientation';
 import { useGameStore } from '../store/gameStore';
 import type { Move } from '../types/cube';
 import {
@@ -112,9 +113,10 @@ export function GestureLayer({ children }: { children: ReactNode }) {
       if (moveQueue.isBusy()) return; // ignore inputs during animation or active drag
       activeTouches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-      // Two-finger touch → orbit with the pair.
+      // Two-finger touch → yaw drag with the pair's horizontal midpoint.
       if (activeTouches.current.size === 2 && e.pointerType === 'touch') {
         const [a, b] = Array.from(activeTouches.current.entries());
+        viewOrientation.beginDrag();
         stateRef.current = {
           kind: 'two-finger-orbit',
           pointerIds: [a[0], b[0]],
@@ -124,6 +126,11 @@ export function GestureLayer({ children }: { children: ReactNode }) {
         return;
       }
       if (activeTouches.current.size > 1) return;
+
+      // Don't start a layer turn or a yaw drag while the view itself is still
+      // animating — the touched face normal wouldn't match what the player is
+      // looking at by the time the drag resolves.
+      if (viewOrientation.isAnimating()) return;
 
       const cubeHit = raycastCube(e);
       // Post-solve / post-objective: still allow orbit (empty-space drag) so
@@ -157,6 +164,7 @@ export function GestureLayer({ children }: { children: ReactNode }) {
         };
         canvas.setPointerCapture(e.pointerId);
       } else {
+        viewOrientation.beginDrag();
         stateRef.current = {
           kind: 'orbiting',
           pointerId: e.pointerId,
@@ -181,14 +189,14 @@ export function GestureLayer({ children }: { children: ReactNode }) {
         if (pts.length < 2) return;
         const cx = (pts[0].x + pts[1].x) / 2;
         const cy = (pts[0].y + pts[1].y) / 2;
-        applyOrbit(rootRef, cx - s.lastX, cy - s.lastY);
+        viewOrientation.updateDrag((cx - s.lastX) * ORBIT_SENSITIVITY);
         s.lastX = cx;
         s.lastY = cy;
         return;
       }
 
       if (s.kind === 'orbiting' && e.pointerId === s.pointerId) {
-        applyOrbit(rootRef, e.clientX - s.lastX, e.clientY - s.lastY);
+        viewOrientation.updateDrag((e.clientX - s.lastX) * ORBIT_SENSITIVITY);
         s.lastX = e.clientX;
         s.lastY = e.clientY;
         return;
@@ -301,9 +309,12 @@ export function GestureLayer({ children }: { children: ReactNode }) {
       const s = stateRef.current;
       if (s.kind === 'two-finger-orbit') {
         if (activeTouches.current.size < 2) {
+          if (canceled) viewOrientation.cancelDrag();
+          else viewOrientation.endDrag();
           // Fall back to single-pointer state if any remains.
           const remaining = Array.from(activeTouches.current.entries())[0];
           if (remaining) {
+            viewOrientation.beginDrag();
             stateRef.current = {
               kind: 'orbiting',
               pointerId: remaining[0],
@@ -324,8 +335,12 @@ export function GestureLayer({ children }: { children: ReactNode }) {
           });
         }
         stateRef.current = { kind: 'idle' };
+      } else if (s.kind === 'orbiting' && s.pointerId === e.pointerId) {
+        if (canceled) viewOrientation.cancelDrag();
+        else viewOrientation.endDrag();
+        stateRef.current = { kind: 'idle' };
       } else if (
-        (s.kind === 'orbiting' || s.kind === 'possible-layer-turn') &&
+        s.kind === 'possible-layer-turn' &&
         s.pointerId === e.pointerId
       ) {
         stateRef.current = { kind: 'idle' };
@@ -358,6 +373,11 @@ export function GestureLayer({ children }: { children: ReactNode }) {
     };
   }, [camera, gl, scene]);
 
+  useFrame((_, delta) => {
+    if (!rootRef.current) return;
+    viewOrientation.tick(delta, rootRef.current.quaternion);
+  });
+
   return <group ref={rootRef}>{children}</group>;
 }
 
@@ -385,31 +405,3 @@ function snapInPlane(
   return snapToAxis(projected);
 }
 
-const worldUpQuat = new THREE.Quaternion();
-const worldRightQuat = new THREE.Quaternion();
-const composedQuat = new THREE.Quaternion();
-
-/**
- * Trackball-style orbit: rotate the cube around the world-Y axis based on
- * horizontal drag, and around the world-X axis based on vertical drag. We
- * apply the delta in *world* space by pre-multiplying it onto the group's
- * existing rotation — that keeps the axes intuitive regardless of the cube's
- * current orientation.
- */
-function applyOrbit(
-  rootRef: React.RefObject<THREE.Group | null>,
-  dx: number,
-  dy: number,
-) {
-  if (!rootRef.current) return;
-  const yaw = dx * ORBIT_SENSITIVITY;
-  const pitch = dy * ORBIT_SENSITIVITY;
-  if (yaw === 0 && pitch === 0) return;
-  worldUpQuat.setFromAxisAngle(WORLD_Y, yaw);
-  worldRightQuat.setFromAxisAngle(WORLD_X, pitch);
-  composedQuat.copy(worldUpQuat).multiply(worldRightQuat);
-  rootRef.current.quaternion.premultiply(composedQuat);
-}
-
-const WORLD_X = new THREE.Vector3(1, 0, 0);
-const WORLD_Y = new THREE.Vector3(0, 1, 0);
