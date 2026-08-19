@@ -25,11 +25,10 @@ const TRACELINE_LENGTH = SIZE * 0.78;
 const TRACELINE_THICKNESS = SIZE * 0.11;
 const TRACELINE_HEIGHT = 0.02;
 /**
- * The sticker uses a drei RoundedBox with radius=0.06, which bulges the
- * sticker geometry outward well beyond its args. Sitting the tracelines
- * at 0.06 above the sticker's centroid keeps them just clear of that bulge.
+ * Sticker top surface sits at STICKER_THICKNESS/2 above the group origin.
+ * Tracelines float just above that with a small gap so they don't z-fight.
  */
-const TRACELINE_Y_H = 0.06;
+const TRACELINE_Y_H = STICKER_THICKNESS / 2 + TRACELINE_HEIGHT / 2 + 0.001;
 /**
  * The vertical bar sits 0.006 higher than the horizontal so they don't
  * occupy the same depth values at the intersection. Two coincident bars
@@ -88,7 +87,7 @@ export function Sticker({ side, highlighted = false }: StickerProps) {
     <group position={position} rotation={rotation}>
       <RoundedBox
         args={[SIZE, STICKER_THICKNESS, SIZE]}
-        radius={0.06}
+        radius={0.008}
         smoothness={3}
         creaseAngle={0.4}
       >
