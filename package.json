@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "node --version && npm --version && node -e \"require('fs').accessSync('node_modules/.bin/tsc'); console.log('tsc bin present')\" && tsc --version && tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"
