@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { viewOrientation } from '../../animation/viewOrientation';
-import { PLAQUE_SURFACE_STYLE } from './RotationTray';
+import { PLAQUE_SURFACE_STYLE } from './plaqueStyle';
 
 /**
  * Flip button — swaps the vertical pole between white-up and yellow-up.

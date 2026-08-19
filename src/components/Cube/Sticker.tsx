@@ -21,6 +21,26 @@ interface StickerProps {
 const HALF = CUBIE_SIZE / 2;
 const SIZE = CUBIE_SIZE - STICKER_INSET * 2;
 
+const TRACELINE_LENGTH = SIZE * 0.78;
+const TRACELINE_THICKNESS = SIZE * 0.11;
+const TRACELINE_HEIGHT = 0.02;
+/**
+ * The sticker uses a drei RoundedBox with radius=0.06, which bulges the
+ * sticker geometry outward well beyond its args. Sitting the tracelines
+ * at 0.06 above the sticker's centroid keeps them just clear of that bulge.
+ */
+const TRACELINE_Y_H = 0.06;
+/**
+ * The vertical bar sits 0.006 higher than the horizontal so they don't
+ * occupy the same depth values at the intersection. Two coincident bars
+ * z-fight and both go invisible; a tiny y-offset resolves it and is not
+ * noticeable at this render distance.
+ */
+const TRACELINE_Y_V = TRACELINE_Y_H + 0.006;
+const TRACELINE_COLOR_HEX = '#7ee9ff';
+const TRACELINE_EMISSIVE_BASE = 1.6;
+const TRACELINE_EMISSIVE_PEAK = 4.2;
+
 const PLACEMENT: Record<
   StickerSide,
   { position: [number, number, number]; rotation: [number, number, number] }
@@ -33,72 +53,6 @@ const PLACEMENT: Record<
   back: { position: [0, 0, -HALF - STICKER_LIFT], rotation: [-Math.PI / 2, 0, 0] },
 };
 
-/**
- * Base + peak opacities for the ambient traceline. Baseline reads as a soft
- * arcade glow etched into each sticker; peak fires briefly on layer commit.
- */
-const TRACELINE_BASE_OPACITY = 0.42;
-const TRACELINE_PEAK_OPACITY = 1.0;
-
-/**
- * Shared additive-blended texture for the ambient traceline "+" that shows
- * players the two swipe axes on every sticker. Generated once at module
- * load, shared across all sticker instances so we pay the canvas cost once.
- */
-const TRACELINE_TEXTURE = createTracelineTexture();
-
-/** Shared plane geometry so every sticker's traceline reuses one buffer. */
-const TRACELINE_GEOMETRY = new THREE.PlaneGeometry(SIZE * 0.78, SIZE * 0.78);
-
-function createTracelineTexture(): THREE.Texture | null {
-  if (typeof document === 'undefined') return null;
-  const canvas = document.createElement('canvas');
-  const px = 160;
-  canvas.width = px;
-  canvas.height = px;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
-
-  ctx.clearRect(0, 0, px, px);
-
-  // Outer glow — soft halo around the cross for the arcade "light" feel.
-  ctx.shadowColor = 'rgba(180, 230, 255, 0.85)';
-  ctx.shadowBlur = 14;
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
-  ctx.lineCap = 'round';
-  ctx.lineWidth = 6;
-
-  const inset = 26;
-  // Horizontal
-  ctx.beginPath();
-  ctx.moveTo(inset, px / 2);
-  ctx.lineTo(px - inset, px / 2);
-  ctx.stroke();
-  // Vertical
-  ctx.beginPath();
-  ctx.moveTo(px / 2, inset);
-  ctx.lineTo(px / 2, px - inset);
-  ctx.stroke();
-
-  // Inner bright core — makes the intersection pop.
-  ctx.shadowBlur = 0;
-  ctx.strokeStyle = 'rgba(255, 255, 255, 1)';
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.moveTo(inset + 4, px / 2);
-  ctx.lineTo(px - inset - 4, px / 2);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(px / 2, inset + 4);
-  ctx.lineTo(px / 2, px - inset - 4);
-  ctx.stroke();
-
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.anisotropy = 4;
-  tex.needsUpdate = true;
-  return tex;
-}
-
 export function Sticker({ side, highlighted = false }: StickerProps) {
   const { position, rotation } = PLACEMENT[side];
   const theme = useActiveTheme();
@@ -106,7 +60,8 @@ export function Sticker({ side, highlighted = false }: StickerProps) {
   const { roughness, metalness, envMapIntensity } = theme.material;
   const color = useMemo(() => new THREE.Color(hex), [hex]);
   const materialRef = useRef<THREE.MeshStandardMaterial>(null);
-  const tracelineMatRef = useRef<THREE.MeshBasicMaterial>(null);
+  const traceHRef = useRef<THREE.MeshStandardMaterial>(null);
+  const traceVRef = useRef<THREE.MeshStandardMaterial>(null);
 
   useFrame(({ clock }) => {
     const mat = materialRef.current;
@@ -119,15 +74,14 @@ export function Sticker({ side, highlighted = false }: StickerProps) {
         mat.emissiveIntensity = 0;
       }
     }
-    const tmat = tracelineMatRef.current;
-    if (tmat) {
-      // Base opacity + pulse from the most recent layer commit.
-      const flash = currentFlashIntensity(performance.now());
-      const target =
-        TRACELINE_BASE_OPACITY +
-        (TRACELINE_PEAK_OPACITY - TRACELINE_BASE_OPACITY) * flash;
-      if (tmat.opacity !== target) tmat.opacity = target;
-    }
+    const flash = currentFlashIntensity(performance.now());
+    const target =
+      TRACELINE_EMISSIVE_BASE +
+      (TRACELINE_EMISSIVE_PEAK - TRACELINE_EMISSIVE_BASE) * flash;
+    const th = traceHRef.current;
+    if (th && th.emissiveIntensity !== target) th.emissiveIntensity = target;
+    const tv = traceVRef.current;
+    if (tv && tv.emissiveIntensity !== target) tv.emissiveIntensity = target;
   });
 
   return (
@@ -146,23 +100,34 @@ export function Sticker({ side, highlighted = false }: StickerProps) {
           envMapIntensity={envMapIntensity}
         />
       </RoundedBox>
-      {TRACELINE_TEXTURE && (
-        <mesh
-          geometry={TRACELINE_GEOMETRY}
-          position={[0, STICKER_THICKNESS / 2 + 0.002, 0]}
-          rotation={[-Math.PI / 2, 0, 0]}
-          renderOrder={2}
-        >
-          <meshBasicMaterial
-            ref={tracelineMatRef}
-            map={TRACELINE_TEXTURE}
-            transparent
-            depthWrite={false}
-            blending={THREE.AdditiveBlending}
-            opacity={TRACELINE_BASE_OPACITY}
-          />
-        </mesh>
-      )}
+      <mesh position={[0, TRACELINE_Y_H, 0]}>
+        <boxGeometry
+          args={[TRACELINE_LENGTH, TRACELINE_HEIGHT, TRACELINE_THICKNESS]}
+        />
+        <meshStandardMaterial
+          ref={traceHRef}
+          color={TRACELINE_COLOR_HEX}
+          emissive={TRACELINE_COLOR_HEX}
+          emissiveIntensity={TRACELINE_EMISSIVE_BASE}
+          roughness={0.3}
+          metalness={0.1}
+          toneMapped={false}
+        />
+      </mesh>
+      <mesh position={[0, TRACELINE_Y_V, 0]}>
+        <boxGeometry
+          args={[TRACELINE_THICKNESS, TRACELINE_HEIGHT, TRACELINE_LENGTH]}
+        />
+        <meshStandardMaterial
+          ref={traceVRef}
+          color={TRACELINE_COLOR_HEX}
+          emissive={TRACELINE_COLOR_HEX}
+          emissiveIntensity={TRACELINE_EMISSIVE_BASE}
+          roughness={0.3}
+          metalness={0.1}
+          toneMapped={false}
+        />
+      </mesh>
     </group>
   );
 }

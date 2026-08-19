@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { viewOrientation } from '../../animation/viewOrientation';
 import { FlipButton } from './FlipButton';
+import { PLAQUE_SURFACE_STYLE } from './plaqueStyle';
 
 /**
  * Edge-to-edge tray at the bottom of the cube canvas — a weathered dark
@@ -27,42 +28,6 @@ export function RotationTray() {
   );
 }
 
-/**
- * Encoded SVG (feTurbulence fractal noise) applied as a background image.
- * Rendered once, tiled by the browser — no runtime cost after first paint.
- * The `%23` escapes are `#` characters inside a data URI.
- */
-const GRAIN_URL =
-  "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.16 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>\")";
-
-/**
- * A handful of larger scuff marks baked in as blurred elliptical highlights.
- * Baked into a single SVG so the surface reads the same on every mount.
- */
-const SCUFFS_URL =
-  "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 60' preserveAspectRatio='none'><g fill='white' fill-opacity='0.05'><ellipse cx='60' cy='42' rx='22' ry='2'/><ellipse cx='190' cy='18' rx='32' ry='1.5'/><ellipse cx='305' cy='34' rx='18' ry='2'/><ellipse cx='355' cy='12' rx='14' ry='1'/><ellipse cx='120' cy='50' rx='10' ry='1'/></g><g fill='black' fill-opacity='0.28'><ellipse cx='90' cy='20' rx='16' ry='1'/><ellipse cx='240' cy='40' rx='24' ry='1.5'/><ellipse cx='330' cy='48' rx='12' ry='1'/></g></svg>\")";
-
-/** Layered background for the weathered plaque surface. */
-const PLAQUE_BG_LAYERS: React.CSSProperties = {
-  backgroundImage: [
-    // Top-center highlight (worn edge)
-    'radial-gradient(120% 60% at 50% -10%, rgba(255,255,255,0.09), transparent 60%)',
-    // Bottom vignette
-    'radial-gradient(120% 100% at 50% 130%, rgba(0,0,0,0.55), transparent 60%)',
-    // Scuff marks
-    SCUFFS_URL,
-    // Fine grain noise
-    GRAIN_URL,
-    // Base metal gradient
-    'linear-gradient(180deg, #1a1a1e 0%, #101014 55%, #08080a 100%)',
-  ].join(', '),
-  backgroundSize: 'auto, auto, 100% 100%, 140px 140px, auto',
-  backgroundRepeat: 'no-repeat, no-repeat, no-repeat, repeat, no-repeat',
-  boxShadow:
-    'inset 0 1px 0 rgba(255,255,255,0.05), inset 0 -1px 0 rgba(0,0,0,0.6), 0 6px 22px rgba(0,0,0,0.55)',
-};
-
-export const PLAQUE_SURFACE_STYLE = PLAQUE_BG_LAYERS;
 
 /**
  * The swipe surface. Purely visual — pointer events fall through to the
@@ -112,7 +77,7 @@ function SwipeRail() {
     <div
       aria-hidden="true"
       className="relative flex h-14 flex-1 items-center overflow-hidden rounded-2xl"
-      style={PLAQUE_BG_LAYERS}
+      style={PLAQUE_SURFACE_STYLE}
     >
       {/* Glow streak — mirrors the drag */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
