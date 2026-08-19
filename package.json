@@ -9,7 +9,8 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "echo STEP1_START && node --version && echo STEP2_NODE_OK && ls node_modules/.bin/tsc && echo STEP3_TSC_BIN_OK && tsc --version && echo STEP4_TSC_RUNS && tsc -b && echo STEP5_TSC_OK && vite build && echo STEP6_VITE_OK",
+    "build": "vite build",
+    "typecheck": "tsc -b",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"
