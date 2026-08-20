@@ -83,6 +83,7 @@ export default function App() {
         <NearSolvedGlow />
         <MilestoneBurst />
         <ObjectiveBanner />
+        <MilestoneChips />
         <HintPanel />
         <DrillOverlay />
         <FloatingFeedback />
@@ -92,10 +93,9 @@ export default function App() {
         <GameHUD.TopBarSlot />
       </div>
       <div
-        className="relative shrink-0 border-t border-white/5 bg-[#0a0b0f]/95 px-4 pt-3"
+        className="relative shrink-0 px-4 pt-3"
         style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 0.75rem)' }}
       >
-        <MilestoneChips />
         {showCubeNet && <CubeNet />}
         {/* AlgorithmPalette hidden from UI — functionality preserved in the component and store. */}
         <GameHUD.BottomBarSlot />

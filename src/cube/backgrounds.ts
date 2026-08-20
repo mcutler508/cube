@@ -60,6 +60,15 @@ export const BACKGROUNDS: CubeBackground[] = [
     // above the cube.
     size: 'auto 100%',
   },
+  {
+    id: 'intergalactic',
+    label: 'Intergalactic',
+    kind: 'image',
+    color: '#03040c',
+    src: '/backgrounds/intergalactic.png',
+    overlay: STARFIELD_OVERLAY,
+    size: 'auto 100%',
+  },
 ];
 
 export const DEFAULT_BACKGROUND_ID = 'graphite';
