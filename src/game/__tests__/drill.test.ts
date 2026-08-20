@@ -43,6 +43,47 @@ describe('drill: white corners level definition', () => {
   });
 });
 
+describe('drill: all drill levels — parametrized invariants', () => {
+  const DRILL_LEVELS = LEVELS.filter((l) => l.drill);
+
+  for (const level of DRILL_LEVELS) {
+    describe(level.id, () => {
+      it('has a drill config with a non-empty algorithm', () => {
+        expect(level.drill!.algorithm.length).toBeGreaterThan(0);
+      });
+
+      it('parMoves matches guided+unlocked reps × algo length', () => {
+        const totalReps = level.drill!.guidedRuns + level.drill!.unlockedRuns;
+        expect(level.parMoves).toBe(totalReps * level.drill!.algorithm.length);
+      });
+
+      it('completes end-to-end when the algorithm is played guided+unlocked times', () => {
+        useGameStore.getState().exitToMenu();
+        useGameStore.getState().loadLevel(level);
+        const total = level.drill!.guidedRuns + level.drill!.unlockedRuns;
+        for (let i = 0; i < total; i++) {
+          for (const move of level.drill!.algorithm) {
+            useGameStore.getState().commitPlayerMove(move);
+          }
+        }
+        expect(useGameStore.getState().objectiveCompleted).toBe(true);
+      });
+
+      it('drill state transitions guided → unlocked at the right rep boundary', () => {
+        useGameStore.getState().exitToMenu();
+        useGameStore.getState().loadLevel(level);
+        for (let i = 0; i < level.drill!.guidedRuns; i++) {
+          for (const move of level.drill!.algorithm) {
+            useGameStore.getState().commitPlayerMove(move);
+          }
+        }
+        expect(useGameStore.getState().drillState!.phase).toBe('unlocked');
+        expect(useGameStore.getState().drillState!.unlockedCompleted).toBe(0);
+      });
+    });
+  }
+});
+
 describe('drill: state initialization', () => {
   it('loadLevel creates a fresh drillState when the level has a drill', () => {
     loadDrill();

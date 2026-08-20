@@ -55,6 +55,39 @@ export const LEVELS: Level[] = [
     },
   },
   {
+    id: 'learn-05-middle-layer-right',
+    name: 'Middle Layer — Right',
+    tier: 'learn',
+    // Middle-layer edge insertion isn't a commutator; the cube ends up
+    // scrambled after 6 reps. That's fine for muscle memory — the drill
+    // tracks completion via drillState, not cube state.
+    setupMoves: [],
+    objective: { type: 'drill_complete' },
+    parMoves: 48, // 6 reps × 8 moves
+    expertMoves: 48,
+    drill: {
+      label: 'Right Insert (U R U′ R′ U′ F′ U F)',
+      algorithm: parseSequence("U R U' R' U' F' U F"),
+      guidedRuns: 2,
+      unlockedRuns: 4,
+    },
+  },
+  {
+    id: 'learn-06-middle-layer-left',
+    name: 'Middle Layer — Left',
+    tier: 'learn',
+    setupMoves: [],
+    objective: { type: 'drill_complete' },
+    parMoves: 48,
+    expertMoves: 48,
+    drill: {
+      label: 'Left Insert (U′ L′ U L U F U′ F′)',
+      algorithm: parseSequence("U' L' U L U F U' F'"),
+      guidedRuns: 2,
+      unlockedRuns: 4,
+    },
+  },
+  {
     id: 'rookie-01-white-cross',
     name: 'White Cross',
     tier: 'rookie',
