@@ -96,76 +96,74 @@ export const THEMES: readonly CubeTheme[] = [
     reticle: { color: '#7ee9ff', intensityScale: 1.0 },
   },
   {
-    // Full-tilt iridescent oil-slick — clearcoat locked, iridescence at 1,
-    // anisotropic streaks for the rainbow smear. This should look like a
-    // holographic sticker under a spotlight.
+    // Iridescent holo, tuned for legibility — dielectric (metalness 0.4)
+    // so base color stays visible instead of being replaced by iridescence.
+    // Thickness range narrowed so shimmer shifts within a band around each
+    // hue rather than sweeping the whole spectrum. Palette saturated hard
+    // to survive the clearcoat + reflection load.
     id: 'amber-mosaic',
     name: 'Amber Mosaic',
     colors: {
-      up: '#d4b8ff',
-      down: '#ffd54a',
-      front: '#26c6b8',
-      back: '#4a6fff',
-      left: '#ffa726',
-      right: '#ff5a2c',
+      up: '#ffffff',
+      down: '#ffe000',
+      front: '#00c26a',
+      back: '#1f5eff',
+      left: '#ff8a1a',
+      right: '#ff2a3a',
     },
     material: {
-      // Roughness kept modest so the shimmer isn't washed out by a mirror
-      // reflection of the envMap. Metalness at 0.8 lets iridescence work as
-      // the dominant color contribution — the base tint becomes a bias, not
-      // a wall. Thickness range widened dramatically so a small viewing-angle
-      // change sweeps through half the visible spectrum.
-      roughness: 0.28,
-      metalness: 0.8,
-      envMapIntensity: 3.2,
+      roughness: 0.32,
+      metalness: 0.4,
+      envMapIntensity: 1.9,
       clearcoat: 1,
-      clearcoatRoughness: 0.04,
-      iridescence: 1,
-      iridescenceIOR: 2.2,
-      iridescenceThicknessRange: [280, 780],
+      clearcoatRoughness: 0.08,
+      iridescence: 0.85,
+      iridescenceIOR: 1.8,
+      iridescenceThicknessRange: [220, 520],
       sheen: 0,
       sheenColor: '#ffffff',
-      ior: 1.6,
-      anisotropy: 0.9,
+      ior: 1.5,
+      anisotropy: 0.6,
       anisotropyRotation: Math.PI / 4,
-      specularIntensity: 1,
-      specularColor: '#ffddee',
+      specularIntensity: 0.9,
+      specularColor: '#ffe0f0',
     },
-    reticle: { color: '#ffc27a', intensityScale: 0.4 },
+    reticle: { color: '#ffc27a', intensityScale: 0.5 },
   },
   {
-    // Polished glass gem — near-zero roughness, ior pushed to sapphire
-    // territory, clearcoat maxed, envMap cranked, anisotropic streak for
-    // that jewel-facet highlight. Reticle nearly disabled so the tile's
-    // own reflections carry the show.
+    // Polished glass gem — clearcoat + fresnel carry the "shiny" read,
+    // but base roughness lifted to 0.12 so the diffuse layer transmits
+    // color instead of the sticker acting as a mirror. envMap dialed
+    // back from over-saturation; iridescence kept subtle so it's
+    // "sparkle" not "prism". Palette pushed toward jewel-tone saturation.
     id: 'glass',
     name: 'Glass',
     colors: {
-      up: '#f5faff',
-      down: '#ffe066',
-      front: '#4ae3ac',
-      back: '#4a9dff',
-      left: '#ffab52',
-      right: '#ff5f70',
+      up: '#ffffff',
+      down: '#ffd200',
+      front: '#00c689',
+      back: '#2278ff',
+      left: '#ff8a1a',
+      right: '#ff2d4a',
     },
     material: {
-      roughness: 0.015,
+      roughness: 0.12,
       metalness: 0,
-      envMapIntensity: 4.5,
+      envMapIntensity: 1.4,
       clearcoat: 1,
-      clearcoatRoughness: 0,
-      iridescence: 0.6,
-      iridescenceIOR: 2.0,
-      iridescenceThicknessRange: [200, 600],
+      clearcoatRoughness: 0.02,
+      iridescence: 0.2,
+      iridescenceIOR: 1.5,
+      iridescenceThicknessRange: [200, 500],
       sheen: 0,
       sheenColor: '#ffffff',
-      ior: 2.0,
-      anisotropy: 0.55,
+      ior: 1.6,
+      anisotropy: 0.3,
       anisotropyRotation: Math.PI / 6,
       specularIntensity: 1,
       specularColor: '#eaf5ff',
     },
-    reticle: { color: '#ffffff', intensityScale: 0.25 },
+    reticle: { color: '#ffffff', intensityScale: 0.35 },
   },
 ];
 
