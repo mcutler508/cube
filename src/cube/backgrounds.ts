@@ -52,11 +52,13 @@ export const BACKGROUNDS: CubeBackground[] = [
     color: '#050716',
     src: '/backgrounds/starfield.png',
     overlay: STARFIELD_OVERLAY,
-    // Source is 1024x1024. `contain` renders it at close to native pixel
-    // density on landscape viewports (letterboxed with #050716 on the
-    // sides, blended by the vignette) — genuinely sharp rather than
-    // upscaled-and-fuzzy.
-    size: 'contain',
+    // Source is 1024x1024. `auto 100%` sizes the image to viewport height
+    // (aspect preserved). On landscape this letterboxes the sides — blended
+    // to #050716 by the vignette — at close to native pixel density. On
+    // portrait it fills top-to-bottom and crops the sides (also masked by
+    // the vignette) so the play field isn't dominated by an empty band
+    // above the cube.
+    size: 'auto 100%',
   },
 ];
 

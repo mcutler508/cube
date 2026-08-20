@@ -12,13 +12,36 @@ import { FACE_COLORS, type StickerSide } from './colors';
  */
 export type ThemeId = string;
 
-/** Per-theme material tuning for the sticker's MeshStandardMaterial. Palette
- *  alone doesn't visually distinguish themes when the surface treatment is
- *  identical — these knobs give each theme its own tactile feel. */
+/** Per-theme surface tuning applied to the sticker's MeshPhysicalMaterial.
+ *  Palette alone doesn't visually distinguish packs when the surface
+ *  treatment is identical — these knobs (roughness, clearcoat, iridescence,
+ *  sheen) push each pack into a distinct corner of the material space so
+ *  Classic reads as matte plastic, Glass as polished glass, etc. */
 export interface ThemeMaterial {
   roughness: number;
   metalness: number;
   envMapIntensity: number;
+  /** Wet-look topcoat. 0 = none, 1 = full lacquer. Big differentiator. */
+  clearcoat: number;
+  /** Sharpness of the clearcoat highlight. Lower = tighter, wetter. */
+  clearcoatRoughness: number;
+  /** Thin-film shimmer (soap bubble / oil slick). 0 disables. */
+  iridescence: number;
+  /** Index of refraction for the iridescent film; only used if iridescence>0. */
+  iridescenceIOR: number;
+  /** Soft off-axis fabric-like sheen. 0 disables. */
+  sheen: number;
+  sheenColor: string;
+}
+
+/** Per-theme reticle (direction indicator) tint. The reticle overlay is a
+ *  strong visual feature — letting each pack own its accent color prevents
+ *  the cyan overlay from making every pack look the same. */
+export interface ThemeReticle {
+  color: string;
+  /** Multiplier on the base emissive intensity. <1 dims so the sticker
+   *  material shows through on glossy packs; >1 brightens for neon packs. */
+  intensityScale: number;
 }
 
 export interface CubeTheme {
@@ -26,6 +49,7 @@ export interface CubeTheme {
   name: string;
   colors: Record<StickerSide, string>;
   material: ThemeMaterial;
+  reticle: ThemeReticle;
 }
 
 export const THEMES: readonly CubeTheme[] = [
@@ -47,6 +71,23 @@ export const THEMES: readonly CubeTheme[] = [
       right: '#ff5a2c',
     },
     material: { roughness: 0.15, metalness: 0.6, envMapIntensity: 1.4 },
+  },
+  {
+    // Glassmorphism: canonical face identity preserved (each hue sits in the
+    // same family as Classic) but pushed toward a jewel-tone, glossy read.
+    // Low roughness + light metalness + high envMap yields sharp highlights
+    // and reflective depth without losing the six-color legibility rule.
+    id: 'glass',
+    name: 'Glass',
+    colors: {
+      up: '#e8f4ff',
+      down: '#ffd84a',
+      front: '#3ad19a',
+      back: '#3d8bff',
+      left: '#ff9a3d',
+      right: '#ff4d5e',
+    },
+    material: { roughness: 0.08, metalness: 0.25, envMapIntensity: 1.8 },
   },
 ];
 

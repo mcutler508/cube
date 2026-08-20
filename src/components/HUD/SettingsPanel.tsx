@@ -82,7 +82,7 @@ export function SettingsPanel() {
           </button>
         </div>
 
-        <Section title="Appearance">
+        <Section title="Sticker Pack">
           <div className="grid grid-cols-2 gap-2 p-2">
             {THEMES.map((theme) => (
               <ThemePreview
