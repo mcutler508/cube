@@ -98,19 +98,46 @@ function MiniFace({
   brightness: number;
   material: CubeTheme['material'];
 }) {
-  // Derive the face treatment from material metrics:
-  //   - Low roughness → sharp specular ribbon along the top edge.
-  //   - High metalness → cleaner face with almost no dark seam.
-  //   - High roughness / low metalness → matte body, prominent dark seam
-  //     (the classic Rubik's raised-tile look).
-  const glossy = material.roughness < 0.25;
-  const specular = glossy
-    ? 'linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.15) 8%, rgba(255,255,255,0) 22%),'
-    : 'linear-gradient(180deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0) 30%),';
-  const seamShadow = glossy
-    ? 'inset 0 -3px 6px rgba(0,0,0,0.15)'
-    : 'inset 0 -6px 10px rgba(0,0,0,0.35)';
-  const border = glossy ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.45)';
+  // Derive the face treatment from the same material tokens the real 3D
+  // sticker consumes so the preview card previews the actual look. Three
+  // visibly distinct treatments, dialed hard:
+  //   - Glass (clearcoat=1, roughness<0.1): tight top highlight, bright
+  //     bottom bounce, wet rim glow.
+  //   - Iridescent (iridescence>=0.75): full prismatic conic overlay +
+  //     anisotropic diagonal streak + amber rim.
+  //   - Matte plastic: soft sheen only, prominent seam.
+  const glassy = material.clearcoat > 0.5 && material.roughness < 0.1;
+  const iridescent = material.iridescence >= 0.75;
+
+  const layers: string[] = [];
+
+  if (glassy) {
+    layers.push('radial-gradient(ellipse at 30% 15%, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.35) 12%, rgba(255,255,255,0) 32%)');
+    layers.push('linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0) 22%)');
+    layers.push('linear-gradient(0deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0) 30%)');
+  } else if (iridescent) {
+    layers.push('linear-gradient(135deg, rgba(255,255,255,0) 20%, rgba(255,255,255,0.55) 40%, rgba(255,255,255,0) 60%)');
+    layers.push('conic-gradient(from 210deg at 35% 25%, rgba(255,90,180,0.55), rgba(90,220,255,0.5), rgba(255,230,120,0.55), rgba(180,90,255,0.55), rgba(255,90,180,0.55))');
+    layers.push('linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0) 30%)');
+  } else {
+    layers.push('linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 38%)');
+  }
+
+  const seamShadow = glassy
+    ? 'inset 0 -4px 8px rgba(0,0,0,0.22)'
+    : iridescent
+    ? 'inset 0 -3px 6px rgba(0,0,0,0.20)'
+    : 'inset 0 -6px 10px rgba(0,0,0,0.4)';
+  const border = glassy
+    ? 'rgba(255,255,255,0.4)'
+    : iridescent
+    ? 'rgba(255,255,255,0.25)'
+    : 'rgba(0,0,0,0.45)';
+  const rim = glassy
+    ? ', 0 0 14px rgba(180,230,255,0.55), 0 0 4px rgba(255,255,255,0.4)'
+    : iridescent
+    ? ', 0 0 10px rgba(255,160,120,0.45)'
+    : '';
 
   return (
     <div
@@ -118,9 +145,9 @@ function MiniFace({
         position: 'absolute',
         inset: 0,
         transform,
-        background: `${specular} ${color}`,
+        background: `${layers.join(', ')}, ${color}`,
         filter: `brightness(${brightness})`,
-        boxShadow: `inset 0 0 0 1px ${border}, ${seamShadow}`,
+        boxShadow: `inset 0 0 0 1px ${border}, ${seamShadow}${rim}`,
       }}
     />
   );

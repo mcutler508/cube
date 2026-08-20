@@ -33,7 +33,6 @@ const SIZE = CUBIE_SIZE - STICKER_INSET * 2;
  * STICKER_THICKNESS / 2; a tiny gap keeps them from z-fighting.
  */
 const RETICLE_Y = STICKER_THICKNESS / 2 + 0.002;
-const RETICLE_COLOR_HEX = '#7ee9ff';
 const RETICLE_EMISSIVE_BASE = 1.6;
 const RETICLE_EMISSIVE_PEAK = 4.2;
 
@@ -72,7 +71,25 @@ export function Sticker({ side, highlighted = false }: StickerProps) {
   const { position, rotation } = PLACEMENT[side];
   const theme = useActiveTheme();
   const hex = theme.colors[side];
-  const { roughness, metalness, envMapIntensity } = theme.material;
+  const {
+    roughness,
+    metalness,
+    envMapIntensity,
+    clearcoat,
+    clearcoatRoughness,
+    iridescence,
+    iridescenceIOR,
+    sheen,
+    sheenColor,
+    ior,
+    anisotropy,
+    anisotropyRotation,
+    specularIntensity,
+    specularColor,
+  } = theme.material;
+  const reticleColor = theme.reticle.color;
+  const reticleBase = RETICLE_EMISSIVE_BASE * theme.reticle.intensityScale;
+  const reticlePeak = RETICLE_EMISSIVE_PEAK * theme.reticle.intensityScale;
   const color = useMemo(() => new THREE.Color(hex), [hex]);
   const materialRef = useRef<THREE.MeshStandardMaterial>(null);
   const reticleMatRef = useRef<THREE.MeshStandardMaterial>(null);
@@ -119,8 +136,8 @@ export function Sticker({ side, highlighted = false }: StickerProps) {
         pulse = amp * (0.5 + 0.5 * Math.sin(t * freq * TAU + phase));
       }
       const flash = currentFlashIntensity(now);
-      const idle = RETICLE_EMISSIVE_BASE + pulse;
-      rm.emissiveIntensity = idle + (RETICLE_EMISSIVE_PEAK - idle) * flash;
+      const idle = reticleBase + pulse * theme.reticle.intensityScale;
+      rm.emissiveIntensity = idle + (reticlePeak - idle) * flash;
     }
 
     // --- Reticle scale pulse (arcade / compass) ---
@@ -159,12 +176,24 @@ export function Sticker({ side, highlighted = false }: StickerProps) {
         smoothness={3}
         creaseAngle={0.4}
       >
-        <meshStandardMaterial
+        <meshPhysicalMaterial
+          key={theme.id}
           ref={materialRef}
           color={color}
           roughness={roughness}
           metalness={metalness}
           envMapIntensity={envMapIntensity}
+          clearcoat={clearcoat}
+          clearcoatRoughness={clearcoatRoughness}
+          iridescence={iridescence}
+          iridescenceIOR={iridescenceIOR}
+          sheen={sheen}
+          sheenColor={sheenColor}
+          ior={ior}
+          anisotropy={anisotropy}
+          anisotropyRotation={anisotropyRotation}
+          specularIntensity={specularIntensity}
+          specularColor={specularColor}
         />
       </RoundedBox>
       {/**
@@ -176,12 +205,12 @@ export function Sticker({ side, highlighted = false }: StickerProps) {
         <mesh ref={reticleMeshRef}>
           <planeGeometry args={[SIZE, SIZE]} />
           <meshStandardMaterial
-            key={styleId}
+            key={`${styleId}-${theme.id}`}
             ref={reticleMatRef}
             color="#000000"
-            emissive={RETICLE_COLOR_HEX}
+            emissive={reticleColor}
             emissiveMap={reticleTexture}
-            emissiveIntensity={RETICLE_EMISSIVE_BASE}
+            emissiveIntensity={reticleBase}
             alphaMap={reticleTexture}
             transparent
             depthWrite={false}
@@ -197,8 +226,8 @@ export function Sticker({ side, highlighted = false }: StickerProps) {
               <meshStandardMaterial
                 ref={sweepHMatRef}
                 color="#000000"
-                emissive={RETICLE_COLOR_HEX}
-                emissiveIntensity={RETICLE_EMISSIVE_PEAK}
+                emissive={reticleColor}
+                emissiveIntensity={reticlePeak}
                 transparent
                 opacity={0}
                 depthWrite={false}
@@ -212,8 +241,8 @@ export function Sticker({ side, highlighted = false }: StickerProps) {
               <meshStandardMaterial
                 ref={sweepVMatRef}
                 color="#000000"
-                emissive={RETICLE_COLOR_HEX}
-                emissiveIntensity={RETICLE_EMISSIVE_PEAK}
+                emissive={reticleColor}
+                emissiveIntensity={reticlePeak}
                 transparent
                 opacity={0}
                 depthWrite={false}

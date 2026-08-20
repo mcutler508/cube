@@ -14,9 +14,9 @@ export type ThemeId = string;
 
 /** Per-theme surface tuning applied to the sticker's MeshPhysicalMaterial.
  *  Palette alone doesn't visually distinguish packs when the surface
- *  treatment is identical — these knobs (roughness, clearcoat, iridescence,
- *  sheen) push each pack into a distinct corner of the material space so
- *  Classic reads as matte plastic, Glass as polished glass, etc. */
+ *  treatment is identical — these knobs push each pack into a distinct
+ *  corner of the material space so Classic reads as matte plastic, Glass as
+ *  polished gem, Amber as iridescent oil-slick, etc. */
 export interface ThemeMaterial {
   roughness: number;
   metalness: number;
@@ -32,6 +32,18 @@ export interface ThemeMaterial {
   /** Soft off-axis fabric-like sheen. 0 disables. */
   sheen: number;
   sheenColor: string;
+  /** Index of refraction — 1.5 is glass, 1.4 plastic, 2.4 diamond. Drives
+   *  fresnel falloff and edge brightening on physical materials. */
+  ior: number;
+  /** Directional stretching of the specular highlight (brushed-metal /
+   *  oil-streak look). 0 disables. */
+  anisotropy: number;
+  /** Rotation of the anisotropic highlight in radians. */
+  anisotropyRotation: number;
+  /** Strength of the specular reflection (0-1). Cranks the highlight
+   *  brightness independently of clearcoat. */
+  specularIntensity: number;
+  specularColor: string;
 }
 
 /** Per-theme reticle (direction indicator) tint. The reticle overlay is a
@@ -54,12 +66,34 @@ export interface CubeTheme {
 
 export const THEMES: readonly CubeTheme[] = [
   {
+    // Premium matte plastic — high roughness, no clearcoat, subtle white
+    // sheen for that soft off-axis fabric bloom. Reads as vintage Rubik's
+    // tile with a modern satin finish.
     id: 'classic',
     name: 'Classic',
     colors: { ...FACE_COLORS },
-    material: { roughness: 0.42, metalness: 0.04, envMapIntensity: 0.6 },
+    material: {
+      roughness: 0.6,
+      metalness: 0.02,
+      envMapIntensity: 0.45,
+      clearcoat: 0,
+      clearcoatRoughness: 1,
+      iridescence: 0,
+      iridescenceIOR: 1.3,
+      sheen: 0.35,
+      sheenColor: '#ffe8d6',
+      ior: 1.4,
+      anisotropy: 0,
+      anisotropyRotation: 0,
+      specularIntensity: 0.35,
+      specularColor: '#ffffff',
+    },
+    reticle: { color: '#7ee9ff', intensityScale: 1.0 },
   },
   {
+    // Full-tilt iridescent oil-slick — clearcoat locked, iridescence at 1,
+    // anisotropic streaks for the rainbow smear. This should look like a
+    // holographic sticker under a spotlight.
     id: 'amber-mosaic',
     name: 'Amber Mosaic',
     colors: {
@@ -70,24 +104,56 @@ export const THEMES: readonly CubeTheme[] = [
       left: '#ffa726',
       right: '#ff5a2c',
     },
-    material: { roughness: 0.15, metalness: 0.6, envMapIntensity: 1.4 },
+    material: {
+      roughness: 0.22,
+      metalness: 0.55,
+      envMapIntensity: 2.2,
+      clearcoat: 1,
+      clearcoatRoughness: 0.08,
+      iridescence: 1,
+      iridescenceIOR: 1.5,
+      sheen: 0,
+      sheenColor: '#ffffff',
+      ior: 1.5,
+      anisotropy: 0.55,
+      anisotropyRotation: Math.PI / 4,
+      specularIntensity: 1,
+      specularColor: '#ffffff',
+    },
+    reticle: { color: '#ffc27a', intensityScale: 0.6 },
   },
   {
-    // Glassmorphism: canonical face identity preserved (each hue sits in the
-    // same family as Classic) but pushed toward a jewel-tone, glossy read.
-    // Low roughness + light metalness + high envMap yields sharp highlights
-    // and reflective depth without losing the six-color legibility rule.
+    // Polished glass gem — near-zero roughness, ior pushed to sapphire
+    // territory, clearcoat maxed, envMap cranked, anisotropic streak for
+    // that jewel-facet highlight. Reticle nearly disabled so the tile's
+    // own reflections carry the show.
     id: 'glass',
     name: 'Glass',
     colors: {
-      up: '#e8f4ff',
-      down: '#ffd84a',
-      front: '#3ad19a',
-      back: '#3d8bff',
-      left: '#ff9a3d',
-      right: '#ff4d5e',
+      up: '#f5faff',
+      down: '#ffe066',
+      front: '#4ae3ac',
+      back: '#4a9dff',
+      left: '#ffab52',
+      right: '#ff5f70',
     },
-    material: { roughness: 0.08, metalness: 0.25, envMapIntensity: 1.8 },
+    material: {
+      roughness: 0.02,
+      metalness: 0,
+      envMapIntensity: 3.5,
+      clearcoat: 1,
+      clearcoatRoughness: 0,
+      iridescence: 0.35,
+      iridescenceIOR: 1.6,
+      sheen: 0,
+      sheenColor: '#ffffff',
+      ior: 1.7,
+      anisotropy: 0.4,
+      anisotropyRotation: Math.PI / 6,
+      specularIntensity: 1,
+      specularColor: '#eaf5ff',
+    },
+    reticle: { color: '#ffffff', intensityScale: 0.35 },
   },
 ];
 
