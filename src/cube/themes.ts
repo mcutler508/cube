@@ -32,6 +32,10 @@ export interface ThemeMaterial {
   /** Soft off-axis fabric-like sheen. 0 disables. */
   sheen: number;
   sheenColor: string;
+  /** Thin-film thickness range in nm. Default [100,400]; widening pushes
+   *  the iridescent color shift through more of the visible spectrum. Higher
+   *  values = deeper rainbow. Only used when iridescence > 0. */
+  iridescenceThicknessRange: [number, number];
   /** Index of refraction — 1.5 is glass, 1.4 plastic, 2.4 diamond. Drives
    *  fresnel falloff and edge brightening on physical materials. */
   ior: number;
@@ -80,12 +84,13 @@ export const THEMES: readonly CubeTheme[] = [
       clearcoatRoughness: 1,
       iridescence: 0,
       iridescenceIOR: 1.3,
-      sheen: 0.35,
+      iridescenceThicknessRange: [100, 400],
+      sheen: 0.6,
       sheenColor: '#ffe8d6',
       ior: 1.4,
       anisotropy: 0,
       anisotropyRotation: 0,
-      specularIntensity: 0.35,
+      specularIntensity: 0.4,
       specularColor: '#ffffff',
     },
     reticle: { color: '#7ee9ff', intensityScale: 1.0 },
@@ -105,22 +110,28 @@ export const THEMES: readonly CubeTheme[] = [
       right: '#ff5a2c',
     },
     material: {
-      roughness: 0.22,
-      metalness: 0.55,
-      envMapIntensity: 2.2,
+      // Roughness kept modest so the shimmer isn't washed out by a mirror
+      // reflection of the envMap. Metalness at 0.8 lets iridescence work as
+      // the dominant color contribution — the base tint becomes a bias, not
+      // a wall. Thickness range widened dramatically so a small viewing-angle
+      // change sweeps through half the visible spectrum.
+      roughness: 0.28,
+      metalness: 0.8,
+      envMapIntensity: 3.2,
       clearcoat: 1,
-      clearcoatRoughness: 0.08,
+      clearcoatRoughness: 0.04,
       iridescence: 1,
-      iridescenceIOR: 1.5,
+      iridescenceIOR: 2.2,
+      iridescenceThicknessRange: [280, 780],
       sheen: 0,
       sheenColor: '#ffffff',
-      ior: 1.5,
-      anisotropy: 0.55,
+      ior: 1.6,
+      anisotropy: 0.9,
       anisotropyRotation: Math.PI / 4,
       specularIntensity: 1,
-      specularColor: '#ffffff',
+      specularColor: '#ffddee',
     },
-    reticle: { color: '#ffc27a', intensityScale: 0.6 },
+    reticle: { color: '#ffc27a', intensityScale: 0.4 },
   },
   {
     // Polished glass gem — near-zero roughness, ior pushed to sapphire
@@ -138,22 +149,23 @@ export const THEMES: readonly CubeTheme[] = [
       right: '#ff5f70',
     },
     material: {
-      roughness: 0.02,
+      roughness: 0.015,
       metalness: 0,
-      envMapIntensity: 3.5,
+      envMapIntensity: 4.5,
       clearcoat: 1,
       clearcoatRoughness: 0,
-      iridescence: 0.35,
-      iridescenceIOR: 1.6,
+      iridescence: 0.6,
+      iridescenceIOR: 2.0,
+      iridescenceThicknessRange: [200, 600],
       sheen: 0,
       sheenColor: '#ffffff',
-      ior: 1.7,
-      anisotropy: 0.4,
+      ior: 2.0,
+      anisotropy: 0.55,
       anisotropyRotation: Math.PI / 6,
       specularIntensity: 1,
       specularColor: '#eaf5ff',
     },
-    reticle: { color: '#ffffff', intensityScale: 0.35 },
+    reticle: { color: '#ffffff', intensityScale: 0.25 },
   },
 ];
 

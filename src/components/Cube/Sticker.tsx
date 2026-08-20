@@ -79,6 +79,7 @@ export function Sticker({ side, highlighted = false }: StickerProps) {
     clearcoatRoughness,
     iridescence,
     iridescenceIOR,
+    iridescenceThicknessRange,
     sheen,
     sheenColor,
     ior,
@@ -187,6 +188,7 @@ export function Sticker({ side, highlighted = false }: StickerProps) {
           clearcoatRoughness={clearcoatRoughness}
           iridescence={iridescence}
           iridescenceIOR={iridescenceIOR}
+          iridescenceThicknessRange={iridescenceThicknessRange}
           sheen={sheen}
           sheenColor={sheenColor}
           ior={ior}
