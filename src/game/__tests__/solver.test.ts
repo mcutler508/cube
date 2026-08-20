@@ -69,7 +69,10 @@ describe('hintForLevel', () => {
   it('returns a hint for every starter level from its starting state', () => {
     // Even L6 (par 9) works because the intended-solution fast path fires
     // immediately when the state matches a step on the canonical solve.
+    // Drill levels are excluded — their next-move guidance comes from
+    // gameStore.drillState, not from cube-state solving.
     for (const level of LEVELS) {
+      if (level.drill) continue;
       const startingState = applyMoves(createSolvedCube(), level.setupMoves);
       const hint = hintForLevel(startingState, level);
       expect(hint, `hintForLevel returned null at start of ${level.id}`).not.toBeNull();

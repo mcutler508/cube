@@ -12,6 +12,9 @@ function playerDuration(): number {
 }
 
 export function enqueuePlayerMove(move: Move) {
+  // Drill gate: in guided phase, wrong moves are hard-blocked before entering
+  // the animation queue. Returns true when no drill is active.
+  if (!useGameStore.getState().gateDrillMove(move)) return;
   moveQueue.push({ move, kind: 'player', duration: playerDuration() });
 }
 

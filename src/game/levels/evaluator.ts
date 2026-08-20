@@ -34,5 +34,12 @@ export function evaluateObjective(state: CubeState, objective: Objective): boole
 
     case 'progress_threshold':
       return evaluateProgress(state).percentage >= objective.threshold;
+
+    case 'drill_complete':
+      // Drill completion is tracked in gameStore.drillState, not in cube
+      // state. The store flips objectiveCompleted=true when the drill
+      // finishes; the evaluator itself returns false so this objective is
+      // never "just from the cube state alone."
+      return false;
   }
 }

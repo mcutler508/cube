@@ -13,6 +13,7 @@ import { RotationTray } from './components/HUD/RotationTray';
 import { HintPanel } from './components/HUD/HintPanel';
 import { MilestoneChips } from './components/HUD/MilestoneChips';
 import { SettingsPanel } from './components/HUD/SettingsPanel';
+import { DrillOverlay } from './components/HUD/DrillOverlay';
 import { LevelSelect } from './components/LevelSelect/LevelSelect';
 import { DailyLanding } from './components/DailyLanding/DailyLanding';
 import { AlgorithmsPanel } from './components/Algorithms/AlgorithmsPanel';
@@ -83,6 +84,7 @@ export default function App() {
         <MilestoneBurst />
         <ObjectiveBanner />
         <HintPanel />
+        <DrillOverlay />
         <FloatingFeedback />
         <AlgorithmToast />
         <OnboardingCoach />

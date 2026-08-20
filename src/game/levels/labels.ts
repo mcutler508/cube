@@ -41,5 +41,7 @@ export function describeObjective(objective: Objective): string {
       return `REACH ${objective.threshold}% PROGRESS`;
     case 'full_solve':
       return 'SOLVE THE CUBE';
+    case 'drill_complete':
+      return 'DRILL THE ALGORITHM';
   }
 }

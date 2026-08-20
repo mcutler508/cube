@@ -268,6 +268,15 @@ export function GestureLayer({ children }: { children: ReactNode }) {
           return;
         }
 
+        // Drill guard: in guided phase, hard-block wrong moves before any
+        // partial rotation renders. Sets misfire → HUD shakes. Once blocked,
+        // exit the possible-turn state so subsequent pointer movement doesn't
+        // keep re-firing.
+        if (!useGameStore.getState().gateDrillMove(primaryMove)) {
+          stateRef.current = { kind: 'idle' };
+          return;
+        }
+
         // Snap the local drag to its dominant in-plane axis.
         const inPlaneDirLocal = snapInPlane(localDrag, s.faceNormalLocal);
         const quarterAngle = quarterAngleForMove(primaryMove);

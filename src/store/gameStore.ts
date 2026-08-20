@@ -15,6 +15,7 @@ import { hintAlgorithmFor, hintForLevel } from '../game/solver';
 import { detectAlgorithm } from '../game/algorithms';
 import { firstUnmetMilestone } from '../game/milestones';
 import { loadSettings, saveSettings, type Settings } from '../game/persistence';
+import type { DrillConfig } from '../game/levels/types';
 
 export type GamePhase = 'ready' | 'playing' | 'solved';
 
@@ -74,6 +75,19 @@ interface GameStore {
   currentLevel: Level | null;
   objectiveCompleted: boolean;
 
+  // --- drill (algorithm practice) ---
+  /**
+   * Present only when the current level is a drill. Tracks position within
+   * the algorithm and phase completion. See DrillConfig in game/levels/types.
+   */
+  drillState: DrillState | null;
+  /**
+   * Timestamp of the most recent wrong-move rejection (guided phase block
+   * or unlocked phase counter-reset). HUD reads this to trigger a shake +
+   * toast, then clears via dismissDrillMisfire.
+   */
+  drillMisfireAt: number | null;
+
   // --- menu routing ---
   /** Which landing screen to show when no level is active. */
   menuView: 'daily' | 'learn' | 'algos';
@@ -104,6 +118,25 @@ interface GameStore {
   setSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
   openSettings: () => void;
   closeSettings: () => void;
+
+  // --- drill actions ---
+  /**
+   * Called before a player move enters the queue. When a drill is active and
+   * we're in guided phase, wrong moves are blocked (returns false, sets
+   * misfire). In unlocked phase and outside drills, always returns true.
+   */
+  gateDrillMove: (move: Move) => boolean;
+  dismissDrillMisfire: () => void;
+}
+
+export interface DrillState {
+  phase: 'guided' | 'unlocked';
+  /** Position within the algorithm sequence (0..algorithm.length-1). */
+  expectedIndex: number;
+  /** Completed algorithm reps in the guided phase. */
+  guidedCompleted: number;
+  /** Consecutive completed reps in the unlocked phase. Any wrong move resets to 0. */
+  unlockedCompleted: number;
 }
 
 const initialProgress = evaluateProgress(createSolvedCube());
@@ -134,6 +167,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   hintCount: 0,
   currentLevel: null,
   objectiveCompleted: false,
+  drillState: null,
+  drillMisfireAt: null,
   menuView: 'daily',
   previewAlgorithmId: null,
   settings: loadSettings(),
@@ -168,11 +203,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const crossDiff = diffLists(s.solvedCrosses, detections.crosses);
     const layerDiff = diffLists(s.solvedLayers, detections.layers);
 
+    // Drill-progression check (runs BEFORE the objective check so a
+    // just-completed drill can flip objectiveHit=true).
+    const drillTransition = advanceDrill(s.currentLevel?.drill ?? null, s.drillState, move);
+    const nextDrillState = drillTransition?.next ?? s.drillState;
+    const drillCompleted = drillTransition?.completed ?? false;
+
     // Level-objective check.
-    const objectiveHit =
+    let objectiveHit =
       s.currentLevel != null &&
       !s.objectiveCompleted &&
       evaluateObjective(next, s.currentLevel.objective);
+    if (drillCompleted && !s.objectiveCompleted) objectiveHit = true;
     const objectiveIsSolve = s.currentLevel?.objective.type === 'full_solve';
     const objectiveFinished = objectiveHit || solved;
 
@@ -194,6 +236,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
     }
 
+    // Unlocked-phase wrong move → set misfire so the HUD shakes.
+    const drillMisfire =
+      drillTransition?.wrongInUnlocked
+        ? now
+        : s.drillMisfireAt;
+
     set({
       cubeState: next,
       history: [...s.history, move],
@@ -211,6 +259,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       bestStreak,
       isNearSolved: isNear,
       objectiveCompleted: objectiveHit ? true : s.objectiveCompleted,
+      drillState: nextDrillState,
+      drillMisfireAt: drillMisfire,
       hintTier: nextHintTier,
       hintTargetMilestone: nextTargetMilestone,
       hintTargetAlgorithm: nextTargetAlgorithm,
@@ -350,6 +400,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   reset: () => {
     const fresh = evaluateProgress(createSolvedCube());
     const freshDetections = detectAll(createSolvedCube());
+    const level = get().currentLevel;
     set({
       cubeState: createSolvedCube(),
       history: [],
@@ -373,6 +424,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       hintTargetAlgorithm: null,
       hintNextMove: null,
       previewAlgorithmId: null,
+      drillState: level?.drill ? freshDrillState() : null,
+      drillMisfireAt: null,
     });
   },
 
@@ -382,6 +435,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({
       currentLevel: level,
       objectiveCompleted: false,
+      drillState: level.drill ? freshDrillState() : null,
+      drillMisfireAt: null,
       hintTier: 0,
       hintTargetMilestone: null,
       hintTargetAlgorithm: null,
@@ -467,6 +522,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       isNearSolved: false,
       currentLevel: null,
       objectiveCompleted: false,
+      drillState: null,
+      drillMisfireAt: null,
       hintTier: 0,
       hintTargetMilestone: null,
       hintTargetAlgorithm: null,
@@ -474,7 +531,102 @@ export const useGameStore = create<GameStore>((set, get) => ({
       previewAlgorithmId: null,
     });
   },
+
+  gateDrillMove: (move) => {
+    const s = get();
+    const drill = s.currentLevel?.drill;
+    if (!drill || !s.drillState) return true;
+    if (s.objectiveCompleted) return false; // drill already cleared, block input
+    const expected = drill.algorithm[s.drillState.expectedIndex];
+    const matches = expected && expected.face === move.face && expected.turns === move.turns;
+    if (s.drillState.phase === 'guided' && !matches) {
+      set({ drillMisfireAt: performance.now() });
+      return false;
+    }
+    return true;
+  },
+
+  dismissDrillMisfire: () => set({ drillMisfireAt: null }),
 }));
+
+function freshDrillState(): DrillState {
+  return {
+    phase: 'guided',
+    expectedIndex: 0,
+    guidedCompleted: 0,
+    unlockedCompleted: 0,
+  };
+}
+
+/**
+ * Given the current drill config, current drill state, and the just-committed
+ * player move, compute the next state and whether the drill just completed.
+ * Returns null when there's no drill or no active state to advance.
+ */
+function advanceDrill(
+  drill: DrillConfig | null,
+  state: DrillState | null,
+  move: Move,
+): { next: DrillState; completed: boolean; wrongInUnlocked: boolean } | null {
+  if (!drill || !state) return null;
+  const expected = drill.algorithm[state.expectedIndex];
+  const matches = expected.face === move.face && expected.turns === move.turns;
+
+  if (!matches) {
+    // In guided phase, wrong moves are gated out before commit — this branch
+    // only fires in unlocked phase, where we reset the counter and rep index.
+    if (state.phase === 'unlocked') {
+      return {
+        next: { ...state, expectedIndex: 0, unlockedCompleted: 0 },
+        completed: false,
+        wrongInUnlocked: true,
+      };
+    }
+    // Defensive: shouldn't be reachable, but if it happens, no-op.
+    return { next: state, completed: false, wrongInUnlocked: false };
+  }
+
+  const nextIndex = state.expectedIndex + 1;
+  const wrapped = nextIndex >= drill.algorithm.length;
+  if (!wrapped) {
+    return {
+      next: { ...state, expectedIndex: nextIndex },
+      completed: false,
+      wrongInUnlocked: false,
+    };
+  }
+
+  // Rep completed.
+  if (state.phase === 'guided') {
+    const guidedCompleted = state.guidedCompleted + 1;
+    if (guidedCompleted >= drill.guidedRuns) {
+      return {
+        next: {
+          phase: 'unlocked',
+          expectedIndex: 0,
+          guidedCompleted,
+          unlockedCompleted: 0,
+        },
+        completed: false,
+        wrongInUnlocked: false,
+      };
+    }
+    return {
+      next: { ...state, expectedIndex: 0, guidedCompleted },
+      completed: false,
+      wrongInUnlocked: false,
+    };
+  }
+
+  // Unlocked rep completed.
+  const unlockedCompleted = state.unlockedCompleted + 1;
+  const completed = unlockedCompleted >= drill.unlockedRuns;
+  return {
+    next: { ...state, expectedIndex: 0, unlockedCompleted },
+    completed,
+    wrongInUnlocked: false,
+  };
+}
 
 export function popHistory(): Move | null {
   const s = useGameStore.getState();

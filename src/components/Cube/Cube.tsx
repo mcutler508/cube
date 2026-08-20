@@ -21,7 +21,16 @@ const tmpVec = new THREE.Vector3();
 
 export function Cube() {
   const cubies = useGameStore((s) => s.cubeState.cubies);
-  const hintFace = null;
+  // During a guided-phase drill, highlight the face of the expected next
+  // move so the player has a visual cue about where to swipe. Cleared when
+  // the drill moves into the unlocked (free-run) phase or ends.
+  const hintFace = useGameStore((s) => {
+    const drill = s.currentLevel?.drill;
+    const ds = s.drillState;
+    if (!drill || !ds || ds.phase !== 'guided' || s.objectiveCompleted) return null;
+    const move = drill.algorithm[ds.expectedIndex];
+    return move?.face ?? null;
+  });
   const cubeStateRef = useRef(useGameStore.getState().cubeState);
   const groupRefs = useRef<Map<number, THREE.Group>>(new Map());
   const animationRef = useRef<RunningAnimation | null>(null);

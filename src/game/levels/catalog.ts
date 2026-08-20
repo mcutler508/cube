@@ -38,6 +38,23 @@ export const LEVELS: Level[] = [
     expertMoves: 1,
   },
   {
+    id: 'learn-04-white-corners',
+    name: 'White Corners',
+    tier: 'learn',
+    // Drill runs on a solved cube: R U R' U' is a commutator that returns
+    // the cube to solved after 6 reps, so we don't need a scramble.
+    setupMoves: [],
+    objective: { type: 'drill_complete' },
+    parMoves: 24, // 6 reps × 4 moves
+    expertMoves: 24,
+    drill: {
+      label: 'Right-Hand Trigger (R U R′ U′)',
+      algorithm: parseSequence("R U R' U'"),
+      guidedRuns: 2,
+      unlockedRuns: 4,
+    },
+  },
+  {
     id: 'rookie-01-white-cross',
     name: 'White Cross',
     tier: 'rookie',

@@ -26,11 +26,16 @@ describe('level catalog', () => {
         expect(evaluateObjective(startingState, level.objective)).toBe(false);
       });
 
-      it('inverse of setup solves the objective (par is achievable)', () => {
-        const inverse = [...level.setupMoves].reverse().map(invertMove);
-        const reverted = applyMoves(startingState, inverse);
-        expect(evaluateObjective(reverted, level.objective)).toBe(true);
-      });
+      // Drill levels have `drill_complete` objectives that are progressed by
+      // the store's drill tracker, not by cube state. The inverse-solves
+      // invariant doesn't apply to them — the "par" is 6× the algorithm.
+      if (!level.drill) {
+        it('inverse of setup solves the objective (par is achievable)', () => {
+          const inverse = [...level.setupMoves].reverse().map(invertMove);
+          const reverted = applyMoves(startingState, inverse);
+          expect(evaluateObjective(reverted, level.objective)).toBe(true);
+        });
+      }
 
       it('par and expert move counts are reasonable', () => {
         expect(level.parMoves).toBeGreaterThan(0);
