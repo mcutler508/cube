@@ -56,17 +56,44 @@ export default function App() {
     );
   }
 
+  const isVideoBg = background.kind === 'video' && !!background.videoSrc;
   return (
     <div
       key={`level-${currentLevelId}`}
       className="fixed inset-0 flex h-full w-full flex-col"
       style={{
         animation: 'screenIn 380ms cubic-bezier(0.16, 1, 0.3, 1)',
-        background: buildBackgroundCss(background),
+        // Video backgrounds paint via a stacked <video> + overlay pair below
+        // (CSS `background` only carries the fallback color). Solid + image
+        // kinds continue to use the CSS background shorthand.
+        background: isVideoBg ? background.color : buildBackgroundCss(background),
         backgroundColor: background.color,
       }}
     >
       <style>{screenTransitionCss}</style>
+      {isVideoBg && (
+        <>
+          <video
+            key={background.videoSrc}
+            className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+            src={background.videoSrc}
+            poster={background.src}
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="auto"
+            aria-hidden="true"
+          />
+          {background.overlay && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0"
+              style={{ background: background.overlay }}
+            />
+          )}
+        </>
+      )}
       <div className="relative flex-1 overflow-hidden">
         {/*
           Inset the cube canvas from the top by the objective banner's

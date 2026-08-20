@@ -5,17 +5,20 @@
  * cheap; image backgrounds are served from /public/backgrounds/.
  */
 
-export type BackgroundKind = 'solid' | 'image';
+export type BackgroundKind = 'solid' | 'image' | 'video';
 
 export interface CubeBackground {
   id: string;
   label: string;
   kind: BackgroundKind;
-  /** Fallback solid color even for image backgrounds — painted while the
-   *  image is still loading and used behind any transparent PNG regions. */
+  /** Fallback solid color for every kind — painted while assets load and
+   *  behind any transparent regions. */
   color: string;
-  /** Image URL (public path) when kind === 'image'. */
+  /** Image URL (public path) for `image` kind, and used as the still-frame
+   *  poster / picker thumbnail for `video` kind. */
   src?: string;
+  /** Video URL (public path) when kind === 'video'. Muted, looping, autoplay. */
+  videoSrc?: string;
   /**
    * Optional CSS layer(s) painted above the image but below the game HUD.
    * Used to add a vignette that blends the image into the surrounding color
@@ -37,6 +40,9 @@ export interface CubeBackground {
  */
 const STARFIELD_OVERLAY =
   'radial-gradient(ellipse 70% 90% at center, rgba(5,7,22,0) 0%, rgba(5,7,22,0) 45%, rgba(5,7,22,0.85) 90%, rgba(5,7,22,1) 100%)';
+
+const AURORA_OVERLAY =
+  'radial-gradient(ellipse 70% 90% at center, rgba(6,4,10,0) 0%, rgba(6,4,10,0) 45%, rgba(6,4,10,0.85) 90%, rgba(6,4,10,1) 100%)';
 
 export const BACKGROUNDS: CubeBackground[] = [
   {
@@ -61,13 +67,28 @@ export const BACKGROUNDS: CubeBackground[] = [
     size: 'auto 100%',
   },
   {
-    id: 'intergalactic',
-    label: 'Intergalactic',
+    id: 'aurora',
+    label: 'Aurora',
     kind: 'image',
-    color: '#03040c',
-    src: '/backgrounds/intergalactic.png',
-    overlay: STARFIELD_OVERLAY,
+    color: '#06040a',
+    src: '/backgrounds/aurora.png',
+    overlay: AURORA_OVERLAY,
+    // Source is 816x1456 (portrait). `auto 100%` fills viewport height and
+    // lets the sides letterbox to #06040a (blended by the vignette). On
+    // portrait mobile this shows most of the swirl; on landscape it stays
+    // sharp with wider dark bars on either side.
     size: 'auto 100%',
+  },
+  {
+    id: 'aurora-live',
+    label: 'Aurora Live',
+    kind: 'video',
+    color: '#06040a',
+    // Still-frame poster (shown during the video's initial load and used as
+    // the picker thumbnail so the settings drawer stays snappy).
+    src: '/backgrounds/aurora.png',
+    videoSrc: '/backgrounds/aurora.mp4',
+    overlay: AURORA_OVERLAY,
   },
 ];
 
