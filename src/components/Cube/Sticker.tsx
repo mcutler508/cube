@@ -92,7 +92,7 @@ export function Sticker({ side, highlighted = false }: StickerProps) {
   const reticleBase = RETICLE_EMISSIVE_BASE * theme.reticle.intensityScale;
   const reticlePeak = RETICLE_EMISSIVE_PEAK * theme.reticle.intensityScale;
   const color = useMemo(() => new THREE.Color(hex), [hex]);
-  const materialRef = useRef<THREE.MeshStandardMaterial>(null);
+  const materialRef = useRef<THREE.MeshPhysicalMaterial>(null);
   const reticleMatRef = useRef<THREE.MeshStandardMaterial>(null);
   const reticleMeshRef = useRef<THREE.Mesh>(null);
   const sweepHMatRef = useRef<THREE.MeshStandardMaterial>(null);

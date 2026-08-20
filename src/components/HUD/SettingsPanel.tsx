@@ -57,11 +57,19 @@ export function SettingsPanel() {
         onClick={close}
         className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-[scrimIn_180ms_ease-out]"
       />
+      {/*
+        Panel is a fixed-height flex column so the header and Done button
+        stay pinned while the middle scrolls. Without this the sections
+        overflow above the mobile viewport with no way to reach the top
+        (the panel is bottom-anchored on small screens).
+        Using dvh so mobile browser chrome (URL bar) collapsing doesn't
+        clip the panel mid-frame.
+      */}
       <div
-        className="relative w-full max-w-md rounded-t-3xl bg-[#14161c] p-5 ring-1 ring-white/10 shadow-2xl shadow-black/60 sm:rounded-3xl animate-[panelIn_240ms_cubic-bezier(0.16,1,0.3,1)]"
-        style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 1.25rem)' }}
+        className="relative flex w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-[#14161c] ring-1 ring-white/10 shadow-2xl shadow-black/60 sm:rounded-3xl animate-[panelIn_240ms_cubic-bezier(0.16,1,0.3,1)]"
+        style={{ maxHeight: 'min(92dvh, 44rem)' }}
       >
-        <div className="mb-4 flex items-center justify-between">
+        <div className="flex shrink-0 items-center justify-between px-5 pb-3 pt-5">
           <h2 className="text-base font-semibold tracking-wide text-white/95">
             Settings
           </h2>
@@ -82,61 +90,68 @@ export function SettingsPanel() {
           </button>
         </div>
 
-        <Section title="Sticker Pack">
-          <div className="grid grid-cols-2 gap-2 p-2">
-            {THEMES.map((theme) => (
-              <ThemePreview
-                key={theme.id}
-                theme={theme}
-                selected={settings.themeId === theme.id}
-                onSelect={() => setSetting('themeId', theme.id)}
-              />
-            ))}
-          </div>
-        </Section>
+        <div className="flex-1 overflow-y-auto overscroll-contain px-5 [scrollbar-gutter:stable]">
+          <Section title="Sticker Pack">
+            <div className="grid grid-cols-2 gap-2 p-2">
+              {THEMES.map((theme) => (
+                <ThemePreview
+                  key={theme.id}
+                  theme={theme}
+                  selected={settings.themeId === theme.id}
+                  onSelect={() => setSetting('themeId', theme.id)}
+                />
+              ))}
+            </div>
+          </Section>
 
-        <Section title="Background">
-          <div className="grid grid-cols-3 gap-2 p-2">
-            {BACKGROUNDS.map((bg) => (
-              <BackgroundPreview
-                key={bg.id}
-                background={bg}
-                selected={resolveBackground(settings.backgroundId).id === bg.id}
-                onSelect={() => setSetting('backgroundId', bg.id)}
-              />
-            ))}
-          </div>
-        </Section>
+          <Section title="Background">
+            <div className="grid grid-cols-3 gap-2 p-2">
+              {BACKGROUNDS.map((bg) => (
+                <BackgroundPreview
+                  key={bg.id}
+                  background={bg}
+                  selected={resolveBackground(settings.backgroundId).id === bg.id}
+                  onSelect={() => setSetting('backgroundId', bg.id)}
+                />
+              ))}
+            </div>
+          </Section>
 
-        <Section title="Direction indicator">
-          <div className="grid grid-cols-3 gap-2 p-2">
-            {RETICLE_STYLES.map((style) => (
-              <ReticlePreview
-                key={style.id}
-                style={style}
-                selected={resolveReticleStyle(settings.reticleStyle) === style.id}
-                onSelect={() => setSetting('reticleStyle', style.id)}
-              />
-            ))}
-          </div>
-        </Section>
+          <Section title="Direction indicator">
+            <div className="grid grid-cols-3 gap-2 p-2">
+              {RETICLE_STYLES.map((style) => (
+                <ReticlePreview
+                  key={style.id}
+                  style={style}
+                  selected={resolveReticleStyle(settings.reticleStyle) === style.id}
+                  onSelect={() => setSetting('reticleStyle', style.id)}
+                />
+              ))}
+            </div>
+          </Section>
 
-        <Section title="Gameplay">
-          <ToggleRow
-            label="Show cube net"
-            description="Display the flattened 2D diagram beneath the cube."
-            checked={settings.showCubeNet}
-            onChange={(v) => setSetting('showCubeNet', v)}
-          />
-        </Section>
+          <Section title="Gameplay">
+            <ToggleRow
+              label="Show cube net"
+              description="Display the flattened 2D diagram beneath the cube."
+              checked={settings.showCubeNet}
+              onChange={(v) => setSetting('showCubeNet', v)}
+            />
+          </Section>
+        </div>
 
-        <button
-          type="button"
-          onClick={close}
-          className="mt-4 w-full rounded-2xl bg-emerald-400 py-3 text-sm font-semibold text-black shadow-lg shadow-emerald-500/20 active:scale-[0.99]"
+        <div
+          className="shrink-0 border-t border-white/5 px-5 pt-3"
+          style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 1rem)' }}
         >
-          Done
-        </button>
+          <button
+            type="button"
+            onClick={close}
+            className="w-full rounded-2xl bg-emerald-400 py-3 text-sm font-semibold text-black shadow-lg shadow-emerald-500/20 active:scale-[0.99]"
+          >
+            Done
+          </button>
+        </div>
 
         <style>{keyframesCss}</style>
       </div>
