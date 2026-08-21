@@ -12,7 +12,13 @@ import type { Level } from './types';
  * nicely with the same animation queue and busy-state subscribers.
  */
 export function loadLevel(level: Level): void {
-  if (moveQueue.hasWork()) return;
+  // Force-reset the move pipeline. We're about to snap the cube back to
+  // solved and (optionally) apply a fresh scramble — any leftover queued
+  // moves or a stuck busy flag from a prior session would only corrupt the
+  // new level. Previously this was `if (hasWork()) return;` which silently
+  // swallowed the click when a prior CubeScene unmounted mid-animation.
+  moveQueue.clear();
+  moveQueue.setBusy(false);
   const store = useGameStore.getState();
   store.reset();
   store.loadLevel(level);

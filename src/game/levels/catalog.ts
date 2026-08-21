@@ -88,6 +88,23 @@ export const LEVELS: Level[] = [
     },
   },
   {
+    id: 'learn-07-yellow-cross',
+    name: 'Yellow Cross',
+    tier: 'learn',
+    // Applied to form the top-face cross regardless of starting pattern
+    // (dot/L/line) — the same sequence, just re-oriented by the player.
+    setupMoves: [],
+    objective: { type: 'drill_complete' },
+    parMoves: 36, // 6 reps × 6 moves
+    expertMoves: 36,
+    drill: {
+      label: 'Yellow Cross (F R U R′ U′ F′)',
+      algorithm: parseSequence("F R U R' U' F'"),
+      guidedRuns: 2,
+      unlockedRuns: 4,
+    },
+  },
+  {
     id: 'rookie-01-white-cross',
     name: 'White Cross',
     tier: 'rookie',

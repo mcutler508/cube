@@ -15,6 +15,7 @@ import { loadLevel } from '../../game/levels/loader';
 import { useGameStore } from '../../store/gameStore';
 import { formatElapsed } from '../HUD/useLiveTimer';
 import { Stars } from '../HUD/Stars';
+import { PlayerChip } from '../Player/PlayerChip';
 
 /**
  * Primary landing. Pick your difficulty (Casual / Regular / Full — same daily
@@ -65,7 +66,10 @@ export function DailyLanding() {
           paddingBottom: 'max(env(safe-area-inset-bottom), 2.5rem)',
         }}
       >
-        <div className="text-[10px] uppercase tracking-[0.4em] text-white/50">Cube</div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="text-[10px] uppercase tracking-[0.4em] text-white/50">Cube</div>
+          <PlayerChip />
+        </div>
         <h1 className="mt-1 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
           Today's Cube
         </h1>

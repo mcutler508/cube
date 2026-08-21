@@ -22,6 +22,9 @@ import { initAudio } from './audio/audio';
 import { initHaptics } from './haptics/haptics';
 import { warmKociembaSolver } from './game/kociembaSolver';
 import { useGameStore } from './store/gameStore';
+import { usePlayerStore } from './store/playerStore';
+import { isSupabaseConfigured } from './auth/supabaseClient';
+import { PlayerSignInModal } from './components/Player/PlayerSignInModal';
 import { resolveBackground, type CubeBackground } from './cube/backgrounds';
 
 /**
@@ -35,12 +38,22 @@ export default function App() {
     initAudio();
     initHaptics();
     warmKociembaSolver();
+    usePlayerStore.getState().hydrate();
   }, []);
 
   const currentLevelId = useGameStore((s) => s.currentLevel?.id ?? null);
   const menuView = useGameStore((s) => s.menuView);
   const showCubeNet = useGameStore((s) => s.settings.showCubeNet);
   const background = useGameStore((s) => resolveBackground(s.settings.backgroundId));
+
+  // Require sign-in before any play (when Supabase is configured). Dev builds
+  // without env vars skip the gate so the app is still playable offline.
+  const player = usePlayerStore((s) => s.player);
+  const hydrated = usePlayerStore((s) => s.hydrated);
+  if (isSupabaseConfigured() && hydrated && !player) {
+    return <PlayerSignInModal initialMode="signup" />;
+  }
+
   if (!currentLevelId) {
     return (
       <div
