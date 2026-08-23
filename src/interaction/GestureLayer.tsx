@@ -120,8 +120,14 @@ export function GestureLayer({ children }: { children: ReactNode }) {
       if (moveQueue.isBusy()) return; // ignore inputs during animation or active drag
       activeTouches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
+      const orientationLocked = isGuidedDrillActive();
+
       // Two-finger touch → yaw drag with the pair's horizontal midpoint.
+      // Suppressed during guided drills so the cube stays locked in canonical
+      // orientation (U up, F front, R right) while the player is learning
+      // notation.
       if (activeTouches.current.size === 2 && e.pointerType === 'touch') {
+        if (orientationLocked) return;
         const [a, b] = Array.from(activeTouches.current.entries());
         viewOrientation.beginDrag();
         stateRef.current = {
@@ -146,6 +152,11 @@ export function GestureLayer({ children }: { children: ReactNode }) {
       const store = useGameStore.getState();
       const layerTurnsBlocked =
         store.phase === 'solved' || store.objectiveCompleted;
+      if (!cubeHit && orientationLocked) {
+        // Empty-space touch during a guided drill: swallow the input rather
+        // than starting an orbit that would rotate the cube out of canonical.
+        return;
+      }
       if (cubeHit && !layerTurnsBlocked) {
         // Compute world-space face normal from mesh-local face normal.
         const meshWorldNormal = normalToWorld(
@@ -404,6 +415,21 @@ export function GestureLayer({ children }: { children: ReactNode }) {
   });
 
   return <group ref={rootRef}>{children}</group>;
+}
+
+/**
+ * True while the player is inside the "guided" phase of an algorithm drill.
+ * Used to lock cube orientation (block orbit/flip) so notation always matches
+ * what the player sees on screen.
+ */
+function isGuidedDrillActive(): boolean {
+  const s = useGameStore.getState();
+  return !!(
+    s.currentLevel?.drill &&
+    s.drillState &&
+    s.drillState.phase === 'guided' &&
+    !s.objectiveCompleted
+  );
 }
 
 function snapToAxis(v: THREE.Vector3): THREE.Vector3 {

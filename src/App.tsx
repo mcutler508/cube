@@ -14,6 +14,7 @@ import { HintPanel } from './components/HUD/HintPanel';
 import { MilestoneChips } from './components/HUD/MilestoneChips';
 import { SettingsPanel } from './components/HUD/SettingsPanel';
 import { DrillOverlay } from './components/HUD/DrillOverlay';
+import { MoveReadout } from './components/HUD/MoveReadout';
 import { LevelSelect } from './components/LevelSelect/LevelSelect';
 import { DailyLanding } from './components/DailyLanding/DailyLanding';
 import { AlgorithmsPanel } from './components/Algorithms/AlgorithmsPanel';
@@ -126,6 +127,7 @@ export default function App() {
         <MilestoneChips />
         <HintPanel />
         <DrillOverlay />
+        <MoveReadout />
         <FloatingFeedback />
         <AlgorithmToast />
         <OnboardingCoach />

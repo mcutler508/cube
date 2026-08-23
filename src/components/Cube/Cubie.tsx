@@ -10,6 +10,12 @@ import { Sticker } from './Sticker';
 interface CubieProps {
   cubie: CubieModel;
   hintFace?: FaceLetter | null;
+  /**
+   * Face letter to render as a subtle white label on this cubie's outward
+   * sticker. Set only when this cubie is a face center AND we're in a
+   * guided drill (see Cube.tsx). Non-center cubies always receive null.
+   */
+  centerLabel?: FaceLetter | null;
   onPointerDown?: (event: THREE.Event & { intersections: THREE.Intersection[] }) => void;
 }
 
@@ -41,7 +47,7 @@ const FACE_NORMAL: Record<FaceLetter, Vec3> = {
  * gets a pulsing emissive glow via the Sticker component.
  */
 export const Cubie = forwardRef<THREE.Group, CubieProps>(function Cubie(
-  { cubie, hintFace = null },
+  { cubie, hintFace = null, centerLabel = null },
   ref,
 ) {
   const stickers = useMemo(() => stickersForHome(cubie.home), [cubie.home]);
@@ -76,7 +82,12 @@ export const Cubie = forwardRef<THREE.Group, CubieProps>(function Cubie(
         />
       </RoundedBox>
       {stickers.map((side) => (
-        <Sticker key={side} side={side} highlighted={side === highlightedSide} />
+        <Sticker
+          key={side}
+          side={side}
+          highlighted={side === highlightedSide}
+          centerLabel={centerLabel && stickers.length === 1 ? centerLabel : null}
+        />
       ))}
     </group>
   );

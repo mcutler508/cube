@@ -26,7 +26,7 @@ export function HintPanel() {
 
   return (
     <div className="pointer-events-none absolute inset-x-0 top-10 z-[11] flex justify-center px-4">
-      <div className="pointer-events-auto flex max-w-[92%] flex-col items-center gap-0.5 rounded-2xl bg-black/70 px-4 py-2 text-center backdrop-blur-md ring-1 ring-amber-300/25 shadow-lg shadow-amber-500/10">
+      <div className="pointer-events-auto flex max-w-[92%] flex-col items-center gap-0.5 rounded-2xl bg-black/60 px-3.5 py-1.5 text-center backdrop-blur-md ring-1 ring-amber-300/20 shadow-md shadow-amber-500/10">
         <div className="flex items-center gap-2">
           <span className="text-[9px] font-bold uppercase tracking-[0.28em] text-amber-200/85">
             Hint · Tier {tier}/4

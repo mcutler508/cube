@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { viewOrientation } from '../../animation/viewOrientation';
+import { useGameStore } from '../../store/gameStore';
 import { FlipButton } from './FlipButton';
 import { PLAQUE_SURFACE_STYLE } from './plaqueStyle';
 
@@ -15,6 +16,20 @@ import { PLAQUE_SURFACE_STYLE } from './plaqueStyle';
  * worn metal" feel of the reference.
  */
 export function RotationTray() {
+  // Hide the whole tray during guided drills — orbit + flip are locked so
+  // the cube stays in canonical orientation. Showing the tray under a
+  // "swipe to spin" label that no longer responds would just confuse the
+  // player mid-drill.
+  const orientationLocked = useGameStore(
+    (s) =>
+      !!(
+        s.currentLevel?.drill &&
+        s.drillState &&
+        s.drillState.phase === 'guided' &&
+        !s.objectiveCompleted
+      ),
+  );
+  if (orientationLocked) return null;
   return (
     <div
       className="pointer-events-none absolute inset-x-0 z-20 flex items-stretch gap-2 px-3"

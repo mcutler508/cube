@@ -117,6 +117,20 @@ class ViewOrientationController {
     this.recomputeTarget();
   }
 
+  /**
+   * Reset to the notation-friendly starting orientation: white face on top,
+   * green face facing the camera, red face on the right. Guided drills call
+   * this on entry so U/R/F always visually match up/front/right — otherwise
+   * the player has to mentally rotate the notation onto whatever pose the
+   * cube happens to be in.
+   */
+  resetToCanonical(): void {
+    if (this.state.kind === 'dragging') this.state = { kind: 'idle' };
+    this.yawIndex = 0;
+    this.flipped = false;
+    this.recomputeTarget();
+  }
+
   isFlipped(): boolean {
     return this.flipped;
   }

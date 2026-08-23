@@ -67,7 +67,7 @@ function TopBarSlot() {
         type="button"
         onClick={openSettings}
         aria-label="Settings"
-        className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.08] text-white/80 ring-1 ring-white/10 backdrop-blur transition-transform hover:bg-white/15 hover:text-white active:scale-95"
+        className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full bg-white/[0.06] text-white/75 ring-1 ring-white/[0.08] backdrop-blur-md transition-all hover:bg-white/[0.12] hover:text-white active:scale-95"
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
           <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.75" />
@@ -114,7 +114,7 @@ function BottomBarSlot() {
 
   return (
     <div className="mt-3 flex justify-center">
-      <div className="flex items-center gap-1.5 rounded-full bg-white/5 p-1.5 ring-1 ring-white/10">
+      <div className="flex items-center gap-1 rounded-full bg-white/[0.04] p-1 ring-1 ring-white/[0.08] shadow-lg shadow-black/25 backdrop-blur-md">
         <HudButton onClick={onMenu} disabled={busy}>
           Menu
         </HudButton>
@@ -156,12 +156,12 @@ function HudButton({
   highlighted?: boolean;
 }) {
   const base =
-    'min-w-[76px] rounded-full px-4 py-3 text-sm font-medium tracking-wide transition-all active:scale-95';
+    'min-w-[72px] rounded-full px-3.5 py-2.5 text-sm font-medium tracking-wide transition-all active:scale-95';
   const style = highlighted
-    ? 'bg-amber-300 text-black shadow-lg shadow-amber-500/40 hover:bg-amber-200'
+    ? 'bg-amber-300 text-black shadow-md shadow-amber-500/30 hover:bg-amber-200'
     : primary
-      ? 'bg-white text-black shadow-lg shadow-black/40 hover:bg-white/95 disabled:bg-white/40 disabled:text-black/60'
-      : 'bg-white/[0.08] text-white/85 hover:bg-white/15 disabled:opacity-40';
+      ? 'bg-white text-black shadow-md shadow-black/30 hover:bg-white/95 disabled:bg-white/40 disabled:text-black/60'
+      : 'bg-white/[0.06] text-white/85 hover:bg-white/[0.12] disabled:opacity-40';
   return (
     <button
       type="button"

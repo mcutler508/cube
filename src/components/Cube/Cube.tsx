@@ -1,5 +1,5 @@
 import { useFrame } from '@react-three/fiber';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { moveQueue } from '../../animation/moveController';
 import {
@@ -9,28 +9,93 @@ import {
 } from '../../animation/layerAnimation';
 import { dragController, type ActiveDrag } from '../../animation/dragController';
 import { mat3ToQuaternion } from '../../animation/orientation';
+import { viewOrientation } from '../../animation/viewOrientation';
 import { CUBIE_SPACING } from '../../cube/geometry';
 import { useGameStore } from '../../store/gameStore';
-import type { Cubie as CubieModel } from '../../types/cube';
+import type { Cubie as CubieModel, FaceLetter, Vec3 } from '../../types/cube';
 import { Cubie } from './Cubie';
 
 const DEFAULT_DURATION = 0.19; // seconds per quarter turn
+const IDLE_HINT_DELAY_MS = 3500;
+
+const FACE_CENTER_HOME: Record<FaceLetter, Vec3> = {
+  R: [1, 0, 0],
+  L: [-1, 0, 0],
+  U: [0, 1, 0],
+  D: [0, -1, 0],
+  F: [0, 0, 1],
+  B: [0, 0, -1],
+};
 
 const tmpQuat = new THREE.Quaternion();
 const tmpVec = new THREE.Vector3();
 
 export function Cube() {
   const cubies = useGameStore((s) => s.cubeState.cubies);
-  // During a guided-phase drill, highlight the face of the expected next
-  // move so the player has a visual cue about where to swipe. Cleared when
-  // the drill moves into the unlocked (free-run) phase or ends.
-  const hintFace = useGameStore((s) => {
+  // During a guided-phase drill, we know which face the player is expected
+  // to turn next. We show that hint on a single "source" piece (the center
+  // cubie of the target face) — but only after the player has been idle
+  // for a few seconds, so they still get to try on their own first.
+  const hintTargetFace = useGameStore((s) => {
     const drill = s.currentLevel?.drill;
     const ds = s.drillState;
     if (!drill || !ds || ds.phase !== 'guided' || s.objectiveCompleted) return null;
     const move = drill.algorithm[ds.expectedIndex];
     return move?.face ?? null;
   });
+  const moveCount = useGameStore((s) => s.moveCount);
+  const currentLevelId = useGameStore((s) => s.currentLevel?.id ?? null);
+  const guidedDrillActive = useGameStore(
+    (s) =>
+      !!(
+        s.currentLevel?.drill &&
+        s.drillState &&
+        s.drillState.phase === 'guided' &&
+        !s.objectiveCompleted
+      ),
+  );
+
+  // Snap the cube back to the notation-friendly orientation (white up, green
+  // front, red right) whenever a guided drill becomes active or the player
+  // switches to a different guided level. Combined with the orbit-lock in
+  // GestureLayer, this keeps U/R/F visually matching up/front/right.
+  useEffect(() => {
+    if (guidedDrillActive) viewOrientation.resetToCanonical();
+  }, [guidedDrillActive, currentLevelId]);
+
+  const [idle, setIdle] = useState(false);
+  useEffect(() => {
+    setIdle(false);
+    if (!hintTargetFace) return;
+    const id = window.setTimeout(() => setIdle(true), IDLE_HINT_DELAY_MS);
+    return () => window.clearTimeout(id);
+  }, [hintTargetFace, moveCount, currentLevelId]);
+
+  const activeHintFace = idle ? hintTargetFace : null;
+  const hintCubieId = useMemo<number | null>(() => {
+    if (!activeHintFace) return null;
+    const [x, y, z] = FACE_CENTER_HOME[activeHintFace];
+    const center = cubies.find(
+      (c) => c.home[0] === x && c.home[1] === y && c.home[2] === z,
+    );
+    return center?.id ?? null;
+  }, [activeHintFace, cubies]);
+
+  // Map of cubieId → face letter for the six center cubies. Populated only
+  // during a guided drill so the labels appear alongside the orientation
+  // lock — outside of drills the cube stays visually pristine.
+  const centerLabelByCubieId = useMemo<Map<number, FaceLetter> | null>(() => {
+    if (!guidedDrillActive) return null;
+    const map = new Map<number, FaceLetter>();
+    for (const face of ['U', 'D', 'R', 'L', 'F', 'B'] as FaceLetter[]) {
+      const [x, y, z] = FACE_CENTER_HOME[face];
+      const c = cubies.find(
+        (cb) => cb.home[0] === x && cb.home[1] === y && cb.home[2] === z,
+      );
+      if (c) map.set(c.id, face);
+    }
+    return map;
+  }, [guidedDrillActive, cubies]);
   const cubeStateRef = useRef(useGameStore.getState().cubeState);
   const groupRefs = useRef<Map<number, THREE.Group>>(new Map());
   const animationRef = useRef<RunningAnimation | null>(null);
@@ -92,7 +157,13 @@ export function Cube() {
   return (
     <group>
       {visibleCubies.map((c) => (
-        <Cubie key={c.id} cubie={c} hintFace={hintFace} ref={getRef(c.id)} />
+        <Cubie
+          key={c.id}
+          cubie={c}
+          hintFace={c.id === hintCubieId ? activeHintFace : null}
+          centerLabel={centerLabelByCubieId?.get(c.id) ?? null}
+          ref={getRef(c.id)}
+        />
       ))}
     </group>
   );

@@ -16,13 +16,21 @@ import {
   resolveReticleStyle,
   RETICLE_ANIM,
 } from '../../cube/reticleStyles';
+import { getCenterLabelTexture } from '../../cube/centerLabels';
 import { useGameStore } from '../../store/gameStore';
 import { dragController } from '../../animation/dragController';
+import type { FaceLetter } from '../../types/cube';
 
 interface StickerProps {
   side: StickerSide;
   /** True when this sticker currently lives on the hint target face. */
   highlighted?: boolean;
+  /**
+   * Face letter to render as a subtle white overlay on this sticker (U, R,
+   * F, etc.). Set only for the six center stickers while a guided drill is
+   * active so the player can always map notation onto the cube visually.
+   */
+  centerLabel?: FaceLetter | null;
 }
 
 const HALF = CUBIE_SIZE / 2;
@@ -37,6 +45,13 @@ const RETICLE_EMISSIVE_BASE = 1.6;
 const RETICLE_EMISSIVE_PEAK = 4.2;
 
 const TAU = Math.PI * 2;
+
+/**
+ * Warm amber used for the guided-drill idle hint. Matches the amber palette
+ * used elsewhere in the HUD (HintPanel, palette buttons) so the visual
+ * language stays consistent across the app.
+ */
+const HINT_EMISSIVE = new THREE.Color('#ffbf3b');
 
 /** Scan-sweep geometry (in world units, derived from the mockup values). */
 const SWEEP_SEG_LEN = SIZE * 0.08;
@@ -67,7 +82,7 @@ function sweepOpacity(t: number): number {
   return 1;
 }
 
-export function Sticker({ side, highlighted = false }: StickerProps) {
+export function Sticker({ side, highlighted = false, centerLabel = null }: StickerProps) {
   const { position, rotation } = PLACEMENT[side];
   const theme = useActiveTheme();
   const hex = theme.colors[side];
@@ -104,6 +119,11 @@ export function Sticker({ side, highlighted = false }: StickerProps) {
   const reticleTexture = useMemo(() => getReticleTexture(styleId), [styleId]);
   const anim = RETICLE_ANIM[styleId];
 
+  const labelTexture = useMemo(
+    () => (centerLabel ? getCenterLabelTexture(centerLabel) : null),
+    [centerLabel],
+  );
+
   /**
    * Random phase seeded once per sticker mount — desyncs the idle animation
    * across ~54 stickers so the cube feels like it's breathing organically
@@ -121,8 +141,8 @@ export function Sticker({ side, highlighted = false }: StickerProps) {
     if (mat) {
       if (highlighted) {
         const w = 0.5 + 0.5 * Math.sin(t * 5.2);
-        mat.emissive.copy(color);
-        mat.emissiveIntensity = 0.35 + w * 0.55;
+        mat.emissive.copy(HINT_EMISSIVE);
+        mat.emissiveIntensity = 0.55 + w * 0.85;
       } else if (mat.emissiveIntensity !== 0) {
         mat.emissiveIntensity = 0;
       }
@@ -221,6 +241,18 @@ export function Sticker({ side, highlighted = false }: StickerProps) {
             toneMapped={false}
           />
         </mesh>
+        {labelTexture && (
+          <mesh position={[0, 0, 0.0025]}>
+            <planeGeometry args={[SIZE * 0.68, SIZE * 0.68]} />
+            <meshBasicMaterial
+              map={labelTexture}
+              transparent
+              depthWrite={false}
+              opacity={0.7}
+              toneMapped={false}
+            />
+          </mesh>
+        )}
         {anim.sweep && (
           <>
             <mesh ref={sweepHRef} position={[0, 0, 0.001]}>
