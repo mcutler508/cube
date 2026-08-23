@@ -48,7 +48,8 @@ export const LEVELS: Level[] = [
     parMoves: 24, // 6 reps × 4 moves
     expertMoves: 24,
     drill: {
-      label: 'Right-Hand Trigger (R U R′ U′)',
+      name: 'Right-Hand Trigger',
+      blurb: 'Inserts white corners into place',
       algorithm: parseSequence("R U R' U'"),
       guidedRuns: 2,
       unlockedRuns: 4,
@@ -66,7 +67,8 @@ export const LEVELS: Level[] = [
     parMoves: 48, // 6 reps × 8 moves
     expertMoves: 48,
     drill: {
-      label: 'Right Insert (U R U′ R′ U′ F′ U F)',
+      name: 'Right Insert',
+      blurb: 'Slots middle-layer edge to the right',
       algorithm: parseSequence("U R U' R' U' F' U F"),
       guidedRuns: 2,
       unlockedRuns: 4,
@@ -81,7 +83,8 @@ export const LEVELS: Level[] = [
     parMoves: 48,
     expertMoves: 48,
     drill: {
-      label: 'Left Insert (U′ L′ U L U F U′ F′)',
+      name: 'Left Insert',
+      blurb: 'Slots middle-layer edge to the left',
       algorithm: parseSequence("U' L' U L U F U' F'"),
       guidedRuns: 2,
       unlockedRuns: 4,
@@ -98,7 +101,8 @@ export const LEVELS: Level[] = [
     parMoves: 36, // 6 reps × 6 moves
     expertMoves: 36,
     drill: {
-      label: 'Yellow Cross (F R U R′ U′ F′)',
+      name: 'Yellow Cross',
+      blurb: 'Forms yellow cross on top face',
       algorithm: parseSequence("F R U R' U' F'"),
       guidedRuns: 2,
       unlockedRuns: 4,

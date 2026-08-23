@@ -29,8 +29,10 @@ export type LevelTier = 'learn' | 'rookie';
  * test would need to relax its "setup produces objective" check.
  */
 export interface DrillConfig {
-  /** Human-readable label surfaced above the counter (e.g., "Sexy Move"). */
-  label: string;
+  /** Short name of the algorithm (e.g., "Sexy Move", "Yellow Cross"). */
+  name: string;
+  /** Optional 4–6 word explanation of what the algorithm does. */
+  blurb?: string;
   /** Ordered move sequence the player must execute per rep. */
   algorithm: Move[];
   /** Reps in the guided (bumpers-on) phase. */

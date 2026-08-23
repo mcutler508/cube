@@ -45,6 +45,7 @@ export default function App() {
   }, []);
 
   const currentLevelId = useGameStore((s) => s.currentLevel?.id ?? null);
+  const isDrillLevel = useGameStore((s) => !!s.currentLevel?.drill);
   const menuView = useGameStore((s) => s.menuView);
   const showCubeNet = useGameStore((s) => s.settings.showCubeNet);
   const background = useGameStore((s) => resolveBackground(s.settings.backgroundId));
@@ -126,7 +127,7 @@ export default function App() {
         <NearSolvedGlow />
         <MilestoneBurst />
         <ObjectiveBanner />
-        <MilestoneChips />
+        {!isDrillLevel && <MilestoneChips />}
         <DrillOverlay />
         <MoveReadout />
         <FloatingFeedback />
