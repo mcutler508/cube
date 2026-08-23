@@ -1,4 +1,5 @@
 import type { StarCount } from './stars';
+import { DEFAULT_BACKGROUND_ID } from '../cube/backgrounds';
 
 /**
  * Per-level personal-best record. Stored in localStorage under a single
@@ -195,7 +196,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showCubeNet: false,
   themeId: 'classic',
   reticleStyle: 'hud',
-  backgroundId: 'graphite',
+  backgroundId: DEFAULT_BACKGROUND_ID,
 };
 
 export function loadSettings(): Settings {

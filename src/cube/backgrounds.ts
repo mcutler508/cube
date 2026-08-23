@@ -44,7 +44,28 @@ const STARFIELD_OVERLAY =
 const AURORA_OVERLAY =
   'radial-gradient(ellipse 70% 90% at center, rgba(6,4,10,0) 0%, rgba(6,4,10,0) 45%, rgba(6,4,10,0.85) 90%, rgba(6,4,10,1) 100%)';
 
+/**
+ * Very light corner darken for the clouds artwork so the HUD chrome (timer,
+ * menu button, undo) keeps enough contrast, without muting the piece's
+ * pastel center where the cube lives.
+ */
+const CLOUDS_OVERLAY =
+  'radial-gradient(ellipse 85% 105% at center, rgba(14,10,18,0) 0%, rgba(14,10,18,0) 60%, rgba(14,10,18,0.45) 100%)';
+
 export const BACKGROUNDS: CubeBackground[] = [
+  {
+    id: 'clouds',
+    label: 'Clouds',
+    kind: 'image',
+    color: '#0e0a12',
+    src: '/backgrounds/clouds.png',
+    overlay: CLOUDS_OVERLAY,
+    // Source is 1024x1024 (square). `cover` fills the viewport and crops the
+    // long edges while preserving aspect — the pale center where the cube
+    // sits stays in frame on both portrait and landscape, and neither axis
+    // gets stretched.
+    size: 'cover',
+  },
   {
     id: 'graphite',
     label: 'Graphite',
@@ -92,7 +113,7 @@ export const BACKGROUNDS: CubeBackground[] = [
   },
 ];
 
-export const DEFAULT_BACKGROUND_ID = 'graphite';
+export const DEFAULT_BACKGROUND_ID = 'clouds';
 
 export function resolveBackground(id: string): CubeBackground {
   return BACKGROUNDS.find((b) => b.id === id) ?? BACKGROUNDS[0];
