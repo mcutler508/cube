@@ -8,16 +8,20 @@ import { useGameStore } from '../../store/gameStore';
 export function useLiveTimer(): number {
   const startedAt = useGameStore((s) => s.startedAt);
   const endedAt = useGameStore((s) => s.endedAt);
+  const pausedAt = useGameStore((s) => s.pausedAt);
   const [, setTick] = useState(0);
 
   useEffect(() => {
-    if (startedAt === null || endedAt !== null) return;
+    if (startedAt === null || endedAt !== null || pausedAt !== null) return;
     const id = window.setInterval(() => setTick((n) => n + 1), 66);
     return () => window.clearInterval(id);
-  }, [startedAt, endedAt]);
+  }, [startedAt, endedAt, pausedAt]);
 
   if (startedAt === null) return 0;
-  const end = endedAt ?? performance.now();
+  // pausedAt takes precedence — clock freezes at the moment the pause menu
+  // opened. On resume, closePauseMenu shifts startedAt so the elapsed value
+  // continues from the frozen number rather than jumping forward.
+  const end = pausedAt ?? endedAt ?? performance.now();
   return Math.max(0, end - startedAt);
 }
 

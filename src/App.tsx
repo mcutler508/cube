@@ -10,11 +10,13 @@ import { ObjectiveCompleteOverlay } from './components/HUD/ObjectiveCompleteOver
 import { OnboardingCoach } from './components/HUD/OnboardingCoach';
 import { AlgorithmToast } from './components/HUD/AlgorithmToast';
 import { RotationTray } from './components/HUD/RotationTray';
-import { HintPanel } from './components/HUD/HintPanel';
 import { MilestoneChips } from './components/HUD/MilestoneChips';
 import { SettingsPanel } from './components/HUD/SettingsPanel';
 import { DrillOverlay } from './components/HUD/DrillOverlay';
 import { MoveReadout } from './components/HUD/MoveReadout';
+import { MenuButton } from './components/HUD/MenuButton';
+import { UndoButton } from './components/HUD/UndoButton';
+import { PauseMenu } from './components/HUD/PauseMenu';
 import { LevelSelect } from './components/LevelSelect/LevelSelect';
 import { DailyLanding } from './components/DailyLanding/DailyLanding';
 import { AlgorithmsPanel } from './components/Algorithms/AlgorithmsPanel';
@@ -125,25 +127,27 @@ export default function App() {
         <MilestoneBurst />
         <ObjectiveBanner />
         <MilestoneChips />
-        <HintPanel />
         <DrillOverlay />
         <MoveReadout />
         <FloatingFeedback />
         <AlgorithmToast />
         <OnboardingCoach />
         <RotationTray />
+        <MenuButton />
+        <UndoButton />
         <GameHUD.TopBarSlot />
       </div>
-      <div
-        className="relative shrink-0 px-4 pt-3"
-        style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 0.75rem)' }}
-      >
-        {showCubeNet && <CubeNet />}
-        {/* AlgorithmPalette hidden from UI — functionality preserved in the component and store. */}
-        <GameHUD.BottomBarSlot />
-      </div>
+      {showCubeNet && (
+        <div
+          className="relative shrink-0 px-4 pt-3"
+          style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 0.75rem)' }}
+        >
+          <CubeNet />
+        </div>
+      )}
       <GameHUD.SolvedOverlaySlot />
       <ObjectiveCompleteOverlay />
+      <PauseMenu />
       <SettingsPanel />
     </div>
   );

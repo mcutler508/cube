@@ -97,6 +97,15 @@ interface GameStore {
   /** True while the settings panel is open (in-level overlay). */
   isSettingsOpen: boolean;
 
+  // --- pause menu ---
+  /**
+   * True while the top-left pause menu is open. Freezes the run timer (see
+   * openPauseMenu / closePauseMenu, which shift startedAt on resume).
+   */
+  isPauseMenuOpen: boolean;
+  /** performance.now() when the pause menu opened; null when not paused. */
+  pausedAt: number | null;
+
   // --- algorithm preview ---
   /** id of an algorithm currently being previewed (not yet executed). */
   previewAlgorithmId: string | null;
@@ -118,6 +127,8 @@ interface GameStore {
   setSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
   openSettings: () => void;
   closeSettings: () => void;
+  openPauseMenu: () => void;
+  closePauseMenu: () => void;
 
   // --- drill actions ---
   /**
@@ -173,6 +184,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   previewAlgorithmId: null,
   settings: loadSettings(),
   isSettingsOpen: false,
+  isPauseMenuOpen: false,
+  pausedAt: null,
 
   commitPlayerMove: (move) => {
     const s = get();
@@ -499,6 +512,35 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   openSettings: () => set({ isSettingsOpen: true }),
   closeSettings: () => set({ isSettingsOpen: false }),
+
+  openPauseMenu: () => {
+    const s = get();
+    if (s.isPauseMenuOpen) return;
+    // Only stamp pausedAt when a run is actually in progress (started, not
+    // ended). Menu-open on a fresh 'ready' level or a 'solved' cube shouldn't
+    // touch the timer.
+    const pausedAt =
+      s.startedAt !== null && s.endedAt === null ? performance.now() : null;
+    set({ isPauseMenuOpen: true, pausedAt });
+  },
+
+  closePauseMenu: () => {
+    const s = get();
+    if (!s.isPauseMenuOpen) return;
+    // Shift startedAt forward by the pause duration so the elapsed math in
+    // useLiveTimer keeps working unchanged and the visible clock resumes
+    // from where it left off.
+    if (s.pausedAt !== null && s.startedAt !== null && s.endedAt === null) {
+      const pauseDuration = performance.now() - s.pausedAt;
+      set({
+        isPauseMenuOpen: false,
+        pausedAt: null,
+        startedAt: s.startedAt + pauseDuration,
+      });
+    } else {
+      set({ isPauseMenuOpen: false, pausedAt: null });
+    }
+  },
 
   exitToMenu: () => {
     const fresh = evaluateProgress(createSolvedCube());
