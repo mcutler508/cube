@@ -39,10 +39,7 @@ export function DrillOverlay() {
   const phaseLabel = isGuided ? 'Guided' : 'Free';
 
   return (
-    <div
-      className="pointer-events-none absolute inset-x-0 top-14 z-20 flex justify-center px-3"
-      style={{ paddingTop: 'max(env(safe-area-inset-top), 0.25rem)' }}
-    >
+    <div className="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex justify-center px-3">
       <div
         className={`pointer-events-auto flex max-w-full items-center gap-1.5 overflow-x-auto rounded-full bg-black/55 pl-2.5 pr-2 py-1 ring-1 ring-white/10 shadow-lg shadow-black/30 backdrop-blur-md ${shaking ? 'drill-shake' : ''}`}
       >

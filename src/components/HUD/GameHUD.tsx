@@ -3,7 +3,6 @@ import { moveQueue } from '../../animation/moveController';
 import { enqueueUndoMove } from '../../animation/enqueue';
 import { exitToMenu, restartCurrentLevel } from '../../game/levels/loader';
 import { popHistory, useGameStore } from '../../store/gameStore';
-import { ProgressMeter } from './ProgressMeter';
 import { SolvedSequence } from './SolvedSequence';
 import { StreakBadge } from './StreakBadge';
 import { formatElapsed, useLiveTimer } from './useLiveTimer';
@@ -52,8 +51,6 @@ function useGameControls() {
  *   - Objective banner (rendered separately in App.tsx, top-center)
  */
 function TopBarSlot() {
-  const moveCount = useGameStore((s) => s.moveCount);
-  const phase = useGameStore((s) => s.phase);
   const openSettings = useGameStore((s) => s.openSettings);
   const elapsed = useLiveTimer();
   const time = formatElapsed(elapsed);
@@ -79,20 +76,12 @@ function TopBarSlot() {
           />
         </svg>
       </button>
-      <div className="flex min-w-[9rem] flex-col items-end gap-0.5">
+      <div className="flex flex-col items-end gap-1">
         <div
           className="font-mono text-xl tabular-nums leading-none text-white/95 drop-shadow sm:text-3xl"
           style={{ letterSpacing: '-0.01em' }}
         >
           {time}
-        </div>
-        <div className="w-40 sm:w-56">
-          <ProgressMeter />
-        </div>
-        <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-white/45">
-          <span>{moveCount} {moveCount === 1 ? 'move' : 'moves'}</span>
-          <span className="text-white/25">•</span>
-          <span>{phase === 'solved' ? 'Solved' : phase === 'playing' ? 'Solving' : 'Ready'}</span>
         </div>
         <StreakBadge />
       </div>
