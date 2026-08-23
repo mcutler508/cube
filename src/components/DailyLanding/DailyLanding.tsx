@@ -14,6 +14,7 @@ import {
 import { loadLevel } from '../../game/levels/loader';
 import { useGameStore } from '../../store/gameStore';
 import { formatElapsed } from '../HUD/useLiveTimer';
+import { MenuBackdrop } from '../HUD/MenuBackdrop';
 import { Stars } from '../HUD/Stars';
 import { PlayerChip } from '../Player/PlayerChip';
 
@@ -58,7 +59,7 @@ export function DailyLanding() {
   }, [bests]);
 
   return (
-    <div className="fixed inset-0 flex flex-col overflow-y-auto bg-[#08090d] text-white">
+    <MenuBackdrop>
       <div
         className="mx-auto flex w-full max-w-lg flex-col px-6 pb-10 pt-10"
         style={{
@@ -175,7 +176,7 @@ export function DailyLanding() {
           </button>
         </div>
       </div>
-    </div>
+    </MenuBackdrop>
   );
 }
 

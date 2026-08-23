@@ -1,6 +1,7 @@
 import { ALGORITHMS } from '../../game/algorithms';
 import { formatSequence } from '../../cube/notation';
 import { useGameStore } from '../../store/gameStore';
+import { MenuBackdrop } from '../HUD/MenuBackdrop';
 
 /**
  * Trigger reference. Shows the six celebrated algorithms with their move
@@ -21,7 +22,7 @@ export function AlgorithmsPanel() {
   const setMenuView = useGameStore((s) => s.setMenuView);
 
   return (
-    <div className="fixed inset-0 flex flex-col overflow-y-auto bg-[#08090d] text-white">
+    <MenuBackdrop>
       <div
         className="mx-auto flex w-full max-w-lg flex-col px-6 pb-10 pt-10"
         style={{
@@ -76,6 +77,6 @@ export function AlgorithmsPanel() {
           bottom, front, back.
         </div>
       </div>
-    </div>
+    </MenuBackdrop>
   );
 }

@@ -6,6 +6,7 @@ import type { Level, LevelTier } from '../../game/levels/types';
 import { getAllBests } from '../../game/persistence';
 import { isLevelUnlocked, tierProgress } from '../../game/progression';
 import { useGameStore } from '../../store/gameStore';
+import { MenuBackdrop } from '../HUD/MenuBackdrop';
 import { Stars } from '../HUD/Stars';
 import type { StarCount } from '../../game/stars';
 
@@ -31,7 +32,7 @@ export function LevelSelect() {
   // updates while a level is playing.
   const bests = useMemo(() => getAllBests(), []);
   return (
-    <div className="fixed inset-0 flex flex-col overflow-y-auto bg-[#08090d] text-white">
+    <MenuBackdrop>
       <div
         className="mx-auto flex w-full max-w-lg flex-col px-6 pb-10 pt-10"
         style={{
@@ -90,7 +91,7 @@ export function LevelSelect() {
           );
         })}
       </div>
-    </div>
+    </MenuBackdrop>
   );
 }
 
