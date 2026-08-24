@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Cube Theme Lab</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body {
+    margin: 0; padding: 0;
+    background: #0b0d10;
+    color: #eaeaea;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  header { padding: 24px 32px 12px; }
+  header h1 { margin: 0 0 4px; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+  header p { margin: 0; color: #8a8f96; font-size: 13px; max-width: 720px; line-height: 1.5; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 20px;
+    padding: 20px 32px 48px;
+  }
+  .card {
+    background: #12161b;
+    border: 1px solid #1e242c;
+    border-radius: 16px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .card .stage {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    background: radial-gradient(ellipse at 50% 40%, #1a2028 0%, #0b0d10 72%);
+    cursor: grab;
+  }
+  .card .stage:active { cursor: grabbing; }
+  .card canvas { display: block; width: 100%; height: 100%; }
+  .card .meta {
+    padding: 12px 16px 4px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .card .name { font-size: 14px; font-weight: 600; }
+  .card .tag {
+    font-size: 10px; color: #6f7580;
+    letter-spacing: 0.1em; text-transform: uppercase;
+  }
+  .card .tag.new { color: #7ee9ff; }
+  .card .desc {
+    padding: 4px 16px 10px;
+    font-size: 12px; color: #8a8f96; line-height: 1.45;
+  }
+  .swatch { display: flex; gap: 4px; padding: 0 16px 14px; }
+  .swatch span {
+    width: 14px; height: 14px; border-radius: 3px;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.45);
+  }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<header>
+  <h1>Cube Theme Lab</h1>
+  <p>1:1 material preview. Same MeshPhysicalMaterial pipeline the game ships, same RoomEnvironment lighting. Drag any cube to rotate. Existing themes are labeled &ldquo;shipping&rdquo;; new candidates are labeled &ldquo;candidate&rdquo;.</p>
+</header>
+<div class="grid" id="grid"></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+
+// ===========================================================================
+// Texture helpers
+// ===========================================================================
+
+function noiseCanvas(size, contrast) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  // Low-freq blob noise: sample a few sines to look like frost, not TV static.
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const u = x / size, v = y / size;
+      let n = 0;
+      n += Math.sin(u * 22.0 + v * 13.7) * 0.5;
+      n += Math.sin(u * 47.3 - v * 31.1 + 1.7) * 0.3;
+      n += (Math.random() - 0.5) * 0.4;
+      const val = 128 + n * 127 * contrast;
+      const i = (y * size + x) * 4;
+      img.data[i] = img.data[i+1] = img.data[i+2] = val;
+      img.data[i+3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return c;
+}
+
+function textureFromCanvas(canvas, opts = {}) {
+  const t = new THREE.CanvasTexture(canvas);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 8;
+  if (opts.srgb) t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+const FROSTED_ROUGHNESS = textureFromCanvas(noiseCanvas(256, 0.6));
+
+function hexToRgb(h) {
+  return {
+    r: parseInt(h.slice(1,3), 16),
+    g: parseInt(h.slice(3,5), 16),
+    b: parseInt(h.slice(5,7), 16),
+  };
+}
+
+function roundRectPath(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+// -- Graffiti tag: one bold spray-paint tag covering the full face -----------
+// Rendered once per face at 1024x1024; each of the 9 face stickers samples
+// its own 1/9th slice via UV offset/repeat so the reassembled face reads as
+// a single continuous piece of art.
+function graffitiFaceTexture(bgColor, tagColor, tag) {
+  const size = 1024;
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d');
+
+  // Wall/cardboard base
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(0, 0, size, size);
+  // Grunge speckles
+  for (let i = 0; i < 12000; i++) {
+    const a = 0.02 + Math.random() * 0.08;
+    const lum = Math.random() < 0.5 ? 0 : 255;
+    ctx.fillStyle = `rgba(${lum},${lum},${lum},${a})`;
+    ctx.fillRect(Math.random()*size, Math.random()*size, 1 + Math.random()*2, 1 + Math.random()*2);
+  }
+  // Faint scratches
+  ctx.strokeStyle = 'rgba(0,0,0,0.10)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 40; i++) {
+    ctx.beginPath();
+    ctx.moveTo(Math.random()*size, Math.random()*size);
+    ctx.lineTo(Math.random()*size, Math.random()*size);
+    ctx.stroke();
+  }
+  // Faded old tag ghost
+  ctx.save();
+  ctx.globalAlpha = 0.12;
+  ctx.translate(size*0.7, size*0.3);
+  ctx.rotate(0.4);
+  ctx.font = 'bold 180px "Impact", "Arial Black", sans-serif';
+  ctx.fillStyle = '#000';
+  ctx.fillText('X', 0, 0);
+  ctx.restore();
+
+  // Main tag
+  ctx.save();
+  ctx.translate(size/2, size/2 + 30);
+  ctx.rotate(-0.08);
+  ctx.font = 'bold 480px "Impact", "Arial Black", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  // Chunky black outline
+  ctx.lineWidth = 34;
+  ctx.strokeStyle = 'rgba(10,10,10,0.95)';
+  ctx.lineJoin = 'round';
+  ctx.strokeText(tag, 0, 0);
+  // Highlight edge (top-left) — cheap 3D bump
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+  ctx.strokeText(tag, -3, -3);
+  // Fill
+  ctx.fillStyle = tagColor;
+  ctx.fillText(tag, 0, 0);
+  // Drips
+  const c1 = hexToRgb(tagColor);
+  for (let i = 0; i < 4; i++) {
+    const dx = -260 + Math.random() * 520;
+    const dy = 100 + Math.random() * 60;
+    const len = 60 + Math.random() * 140;
+    const g = ctx.createLinearGradient(0, dy, 0, dy + len);
+    g.addColorStop(0, tagColor);
+    g.addColorStop(1, `rgba(${c1.r},${c1.g},${c1.b},0)`);
+    ctx.fillStyle = g;
+    ctx.fillRect(dx, dy, 10, len);
+  }
+  ctx.restore();
+
+  // Spray speckles halo around the tag
+  ctx.save();
+  ctx.translate(size/2, size/2);
+  for (let i = 0; i < 900; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const r = 240 + Math.random() * 220;
+    ctx.fillStyle = `rgba(${c1.r},${c1.g},${c1.b},${Math.random() * 0.55})`;
+    ctx.fillRect(Math.cos(a)*r, Math.sin(a)*r, 2, 2);
+  }
+  ctx.restore();
+
+  return c;
+}
+
+// Given a base face-tag canvas, return a texture that samples the given
+// (col, row) slice — col and row are 0..2, so a 3x3 sticker face reassembles
+// into the whole tag.
+function graffitiSliceTexture(faceCanvas, col, row) {
+  const t = new THREE.CanvasTexture(faceCanvas);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  t.repeat.set(1/3, 1/3);
+  // Three.js texture Y is bottom-up; row 0 = top of the face means high V.
+  t.offset.set(col / 3, (2 - row) / 3);
+  return t;
+}
+
+// -- Enamel pin: metallic gold border ring around glossy colored enamel core.
+// Uses color + metalness + roughness maps so the border reads as gold metal
+// and the center reads as poured enamel, with one shared clearcoat.
+function enamelMaps(centerColor) {
+  const size = 512;
+  const inset = 46;
+  const r = 32;
+
+  // Color map — gold rim + colored enamel core
+  const colorCanvas = document.createElement('canvas');
+  colorCanvas.width = colorCanvas.height = size;
+  const cctx = colorCanvas.getContext('2d');
+  // Gold with subtle radial gradient for depth
+  const gold = cctx.createLinearGradient(0, 0, size, size);
+  gold.addColorStop(0, '#f6dc8a');
+  gold.addColorStop(0.5, '#c99a3d');
+  gold.addColorStop(1, '#e6c66c');
+  cctx.fillStyle = gold;
+  cctx.fillRect(0, 0, size, size);
+  // Enamel core
+  cctx.fillStyle = centerColor;
+  roundRectPath(cctx, inset, inset, size - inset*2, size - inset*2, r);
+  cctx.fill();
+  // Micro rim highlight where enamel meets metal
+  cctx.strokeStyle = 'rgba(0,0,0,0.35)';
+  cctx.lineWidth = 2;
+  roundRectPath(cctx, inset, inset, size - inset*2, size - inset*2, r);
+  cctx.stroke();
+  const map = new THREE.CanvasTexture(colorCanvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.anisotropy = 8;
+
+  // Metalness — white=metal on the rim, black=dielectric in the core
+  const mCanvas = document.createElement('canvas');
+  mCanvas.width = mCanvas.height = size;
+  const mctx = mCanvas.getContext('2d');
+  mctx.fillStyle = '#ffffff';
+  mctx.fillRect(0, 0, size, size);
+  mctx.fillStyle = '#000000';
+  roundRectPath(mctx, inset, inset, size - inset*2, size - inset*2, r);
+  mctx.fill();
+  const metalnessMap = new THREE.CanvasTexture(mCanvas);
+
+  // Roughness — brushed-ish gold rim, high-polish enamel center
+  const rCanvas = document.createElement('canvas');
+  rCanvas.width = rCanvas.height = size;
+  const rctx = rCanvas.getContext('2d');
+  rctx.fillStyle = '#525252'; // ~0.32 roughness for the rim
+  rctx.fillRect(0, 0, size, size);
+  // Add faint brushed streaks
+  rctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  rctx.lineWidth = 1;
+  for (let i = 0; i < 400; i++) {
+    const y = Math.random() * size;
+    rctx.beginPath();
+    rctx.moveTo(0, y);
+    rctx.lineTo(size, y + (Math.random()-0.5)*4);
+    rctx.stroke();
+  }
+  rctx.fillStyle = '#141414'; // ~0.08 for glossy enamel
+  roundRectPath(rctx, inset, inset, size - inset*2, size - inset*2, r);
+  rctx.fill();
+  const roughnessMap = new THREE.CanvasTexture(rCanvas);
+
+  return { map, metalnessMap, roughnessMap };
+}
+
+// ===========================================================================
+// Themes
+// ===========================================================================
+
+const CLASSIC_COLORS = {
+  right: '#d62828', left: '#f77f00', up: '#f8f8f2',
+  down: '#f6c000', front: '#2a9d5c', back: '#1e5fb8',
+};
+
+const THEMES = [
+  // --- Existing (shipping) ---
+  {
+    id: 'classic',
+    name: 'Classic',
+    tag: 'shipping',
+    desc: 'Matte plastic with a warm sheen. Vintage Rubik’s tile with a modern satin finish.',
+    colors: CLASSIC_COLORS,
+    makeMaterial(side) {
+      return new THREE.MeshPhysicalMaterial({
+        color: this.colors[side],
+        roughness: 0.6, metalness: 0.02, envMapIntensity: 0.45,
+        clearcoat: 0, clearcoatRoughness: 1,
+        sheen: 0.6, sheenColor: new THREE.Color('#ffe8d6'),
+        ior: 1.4, specularIntensity: 0.4,
+      });
+    },
+  },
+  {
+    id: 'amber',
+    name: 'Amber Mosaic',
+    tag: 'shipping',
+    desc: 'Iridescent holo lacquer. Base color survives, shimmer plays across the surface.',
+    colors: { up:'#ffffff', down:'#ffe000', front:'#00c26a', back:'#1f5eff', left:'#ff8a1a', right:'#ff2a3a' },
+    makeMaterial(side) {
+      return new THREE.MeshPhysicalMaterial({
+        color: this.colors[side],
+        roughness: 0.32, metalness: 0.4, envMapIntensity: 1.9,
+        clearcoat: 1, clearcoatRoughness: 0.08,
+        iridescence: 0.85, iridescenceIOR: 1.8,
+        iridescenceThicknessRange: [220, 520],
+        ior: 1.5, anisotropy: 0.6, anisotropyRotation: Math.PI/4,
+        specularIntensity: 0.9, specularColor: new THREE.Color('#ffe0f0'),
+      });
+    },
+  },
+  {
+    id: 'glass',
+    name: 'Glass',
+    tag: 'shipping',
+    desc: 'Polished jewel-tone gem. Clearcoat and fresnel do the heavy lifting.',
+    colors: { up:'#ffffff', down:'#ffd200', front:'#00c689', back:'#2278ff', left:'#ff8a1a', right:'#ff2d4a' },
+    makeMaterial(side) {
+      return new THREE.MeshPhysicalMaterial({
+        color: this.colors[side],
+        roughness: 0.12, metalness: 0, envMapIntensity: 1.4,
+        clearcoat: 1, clearcoatRoughness: 0.02,
+        iridescence: 0.2, iridescenceIOR: 1.5,
+        iridescenceThicknessRange: [200, 500],
+        ior: 1.6, anisotropy: 0.3, anisotropyRotation: Math.PI/6,
+        specularIntensity: 1, specularColor: new THREE.Color('#eaf5ff'),
+      });
+    },
+  },
+  // --- New candidates ---
+  {
+    id: 'frosted',
+    name: 'Frosted Glass',
+    tag: 'candidate',
+    desc: 'Real light transmission. Color comes from attenuation as light passes through, softened by procedural frost noise.',
+    isNew: true,
+    colors: { up:'#f0f4ee', down:'#e8c765', front:'#5aa88a', back:'#4a7ea8', left:'#d88a68', right:'#c85a70' },
+    makeMaterial(side) {
+      const col = new THREE.Color(this.colors[side]);
+      return new THREE.MeshPhysicalMaterial({
+        color: col,
+        roughness: 0.38, roughnessMap: FROSTED_ROUGHNESS,
+        metalness: 0, envMapIntensity: 1.2,
+        transmission: 0.82, thickness: 0.5,
+        attenuationColor: col, attenuationDistance: 0.7,
+        ior: 1.45,
+        clearcoat: 0.4, clearcoatRoughness: 0.28,
+        specularIntensity: 0.9,
+      });
+    },
+  },
+  {
+    id: 'graffiti',
+    name: 'Graffiti (Street)',
+    tag: 'candidate',
+    desc: 'Each face is one continuous spray-paint tag on cardboard, tiled across the 3×3 sticker grid. Matte, textured, low-shine.',
+    isNew: true,
+    colors: { up:'#8a7f6c', down:'#6b5f4e', front:'#5a4a3a', back:'#4a3f30', left:'#6f5b48', right:'#7a6650' },
+    tags: {
+      up:    { text: 'REX', color: '#ff3355' },
+      down:  { text: 'ZEN', color: '#ffcc22' },
+      front: { text: 'OMG', color: '#22ddaa' },
+      back:  { text: 'MOB', color: '#3388ff' },
+      left:  { text: 'KID', color: '#ff8822' },
+      right: { text: 'ACE', color: '#dd44ff' },
+    },
+    _faceCanvas: {},
+    makeMaterial(side, gridPos) {
+      if (!this._faceCanvas[side]) {
+        const t = this.tags[side];
+        this._faceCanvas[side] = graffitiFaceTexture(this.colors[side], t.color, t.text);
+      }
+      const slice = graffitiSliceTexture(this._faceCanvas[side], gridPos.col, gridPos.row);
+      return new THREE.MeshPhysicalMaterial({
+        map: slice,
+        color: '#ffffff',
+        roughness: 0.78, metalness: 0,
+        envMapIntensity: 0.55, clearcoat: 0,
+        sheen: 0.18, sheenColor: new THREE.Color('#a09080'),
+      });
+    },
+  },
+  {
+    id: 'enamel',
+    name: 'Enamel Pin',
+    tag: 'candidate',
+    desc: 'Metallic gold rim framing a poured-enamel core. Uses metalness + roughness maps so the border reads as real gold, the center as glossy enamel.',
+    isNew: true,
+    colors: { up:'#f0efe8', down:'#f5c542', front:'#2ea86a', back:'#3573d0', left:'#f27d38', right:'#dc3547' },
+    _cache: {},
+    makeMaterial(side) {
+      if (!this._cache[side]) this._cache[side] = enamelMaps(this.colors[side]);
+      const m = this._cache[side];
+      return new THREE.MeshPhysicalMaterial({
+        map: m.map,
+        metalnessMap: m.metalnessMap,
+        roughnessMap: m.roughnessMap,
+        metalness: 1, roughness: 1,
+        envMapIntensity: 1.7,
+        clearcoat: 1, clearcoatRoughness: 0.05,
+      });
+    },
+  },
+];
+
+// ===========================================================================
+// Scene setup
+// ===========================================================================
+
+// A single hidden renderer used only to bake the PMREM environment map. The
+// resulting cube texture is shared across every per-card renderer below.
+const envRenderer = new THREE.WebGLRenderer();
+const pmrem = new THREE.PMREMGenerator(envRenderer);
+const ENV = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+pmrem.dispose();
+envRenderer.dispose();
+
+// Grid position (col 0..2, row 0..2) of a sticker on its face, given the
+// cubie's (x, y, z) each in {-1, 0, 1}. Row 0 = visual top of the face.
+function gridPosFor(side, x, y, z) {
+  switch (side) {
+    case 'up':    return { col: x + 1, row: z + 1 };
+    case 'down':  return { col: x + 1, row: 1 - z };
+    case 'front': return { col: x + 1, row: 1 - y };
+    case 'back':  return { col: 1 - x, row: 1 - y };
+    case 'right': return { col: 1 - z, row: 1 - y };
+    case 'left':  return { col: z + 1, row: 1 - y };
+  }
+}
+
+function buildCube(theme) {
+  const group = new THREE.Group();
+  const CUBIE = 0.32;
+  const STICKER = 0.30;
+  const STICKER_T = 0.028;
+  const LIFT = 0.001;
+
+  const cubieGeom = new RoundedBoxGeometry(CUBIE, CUBIE, CUBIE, 2, 0.02);
+  const stickerGeom = new RoundedBoxGeometry(STICKER, STICKER_T, STICKER, 2, 0.008);
+  const bodyMat = new THREE.MeshStandardMaterial({ color: '#0a0a0a', roughness: 0.85 });
+
+  for (let x = -1; x <= 1; x++) {
+    for (let y = -1; y <= 1; y++) {
+      for (let z = -1; z <= 1; z++) {
+        const body = new THREE.Mesh(cubieGeom, bodyMat);
+        body.position.set(x * CUBIE, y * CUBIE, z * CUBIE);
+        group.add(body);
+
+        const sides = [];
+        if (x ===  1) sides.push(['right', [ CUBIE/2 + LIFT, 0, 0], [0, 0, -Math.PI/2]]);
+        if (x === -1) sides.push(['left',  [-CUBIE/2 - LIFT, 0, 0], [0, 0,  Math.PI/2]]);
+        if (y ===  1) sides.push(['up',    [0,  CUBIE/2 + LIFT, 0], [0, 0, 0]]);
+        if (y === -1) sides.push(['down',  [0, -CUBIE/2 - LIFT, 0], [Math.PI, 0, 0]]);
+        if (z ===  1) sides.push(['front', [0, 0,  CUBIE/2 + LIFT], [ Math.PI/2, 0, 0]]);
+        if (z === -1) sides.push(['back',  [0, 0, -CUBIE/2 - LIFT], [-Math.PI/2, 0, 0]]);
+
+        for (const [side, pos, rot] of sides) {
+          const gp = gridPosFor(side, x, y, z);
+          const mat = theme.makeMaterial(side, gp);
+          const sticker = new THREE.Mesh(stickerGeom, mat);
+          sticker.position.set(x * CUBIE + pos[0], y * CUBIE + pos[1], z * CUBIE + pos[2]);
+          sticker.rotation.set(rot[0], rot[1], rot[2]);
+          group.add(sticker);
+        }
+      }
+    }
+  }
+  return group;
+}
+
+function makeCard(theme) {
+  const card = document.createElement('div');
+  card.className = 'card';
+
+  const stage = document.createElement('div');
+  stage.className = 'stage';
+  const canvas = document.createElement('canvas');
+  stage.appendChild(canvas);
+  card.appendChild(stage);
+
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+  meta.innerHTML = `
+    <span class="name">${theme.name}</span>
+    <span class="tag${theme.isNew ? ' new' : ''}">${theme.tag}</span>
+  `;
+  card.appendChild(meta);
+
+  const desc = document.createElement('div');
+  desc.className = 'desc';
+  desc.textContent = theme.desc;
+  card.appendChild(desc);
+
+  const swatch = document.createElement('div');
+  swatch.className = 'swatch';
+  ['up', 'left', 'front', 'right', 'back', 'down'].forEach((s) => {
+    const sw = document.createElement('span');
+    sw.style.background = theme.colors[s];
+    swatch.appendChild(sw);
+  });
+  card.appendChild(swatch);
+
+  return { card, canvas };
+}
+
+const grid = document.getElementById('grid');
+const scenes = [];
+
+for (const theme of THEMES) {
+  const { card, canvas } = makeCard(theme);
+  grid.appendChild(card);
+
+  const scene = new THREE.Scene();
+  scene.environment = ENV;
+
+  const cube = buildCube(theme);
+  scene.add(cube);
+
+  // A single soft key light for highlight direction on top of the env map.
+  const key = new THREE.DirectionalLight(0xffffff, 0.7);
+  key.position.set(2.2, 3.0, 3.4);
+  scene.add(key);
+
+  const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 100);
+  camera.position.set(1.7, 1.3, 2.1);
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 0.95;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+  const controls = new OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.enablePan = false;
+  controls.autoRotate = true;
+  controls.autoRotateSpeed = 0.7;
+  controls.minDistance = 1.3;
+  controls.maxDistance = 4.5;
+  controls.target.set(0, 0, 0);
+
+  // Pause auto-rotate briefly while the user is interacting; resume after idle.
+  let interactTimer = null;
+  controls.addEventListener('start', () => {
+    controls.autoRotate = false;
+    if (interactTimer) clearTimeout(interactTimer);
+  });
+  controls.addEventListener('end', () => {
+    if (interactTimer) clearTimeout(interactTimer);
+    interactTimer = setTimeout(() => { controls.autoRotate = true; }, 2500);
+  });
+
+  const entry = { scene, camera, renderer, controls, canvas, visible: true };
+  scenes.push(entry);
+
+  // Only render when the card is on-screen. Six live WebGL scenes at 60fps is
+  // fine on desktop, but there's no reason to burn cycles on an off-screen one.
+  const io = new IntersectionObserver(
+    ([e]) => { entry.visible = e.isIntersecting; },
+    { threshold: 0.01 },
+  );
+  io.observe(card);
+}
+
+function resize(entry) {
+  const { canvas, renderer, camera } = entry;
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+  const dpr = renderer.getPixelRatio();
+  if (canvas.width !== Math.floor(w * dpr) || canvas.height !== Math.floor(h * dpr)) {
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+}
+
+function tick() {
+  for (const s of scenes) {
+    if (!s.visible) continue;
+    resize(s);
+    s.controls.update();
+    s.renderer.render(s.scene, s.camera);
+  }
+  requestAnimationFrame(tick);
+}
+tick();
+</script>
+</body>
+</html>

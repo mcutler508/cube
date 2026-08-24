@@ -6,8 +6,11 @@ import { moveQueue } from '../../animation/moveController';
 /**
  * Full-screen pause overlay. Opened by the top-left menu button. Freezes the
  * run timer (via the pausedAt state), scrims + blurs the cube behind, and
- * exposes the three level-scope actions: resume, restart, return to menu,
- * plus a shortcut into the settings panel.
+ * exposes the level-scope actions: resume, restart, return to menu.
+ *
+ * Settings (backgrounds, theme, reticle) live on the main-menu backdrop so
+ * they're globally scoped rather than mid-level cosmetics; this overlay
+ * stays deliberately narrow to level-scoped actions.
  *
  * Clicking the scrim, hitting Escape, or pressing the phone back gesture
  * closes the menu (history-marker pattern mirrors SettingsPanel).
@@ -15,7 +18,6 @@ import { moveQueue } from '../../animation/moveController';
 export function PauseMenu() {
   const isOpen = useGameStore((s) => s.isPauseMenuOpen);
   const close = useGameStore((s) => s.closePauseMenu);
-  const openSettings = useGameStore((s) => s.openSettings);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -47,13 +49,6 @@ export function PauseMenu() {
     if (moveQueue.hasWork()) return;
     close();
     exitToMenu();
-  };
-
-  const onSettings = () => {
-    // Leave the pause menu open underneath the settings panel — SettingsPanel
-    // renders at z-50 so it stacks above cleanly, and closing settings drops
-    // the player back into the paused state.
-    openSettings();
   };
 
   return (
@@ -90,7 +85,6 @@ export function PauseMenu() {
 
         <div className="flex flex-col gap-2">
           <MenuButton onClick={close} label="Resume" primary />
-          <MenuButton onClick={onSettings} label="Settings" />
           <MenuButton onClick={onRestart} label="Restart level" />
           <MenuButton onClick={onExit} label="Return to menu" tone="danger" />
         </div>

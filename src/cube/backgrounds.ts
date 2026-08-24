@@ -41,16 +41,30 @@ export interface CubeBackground {
 const STARFIELD_OVERLAY =
   'radial-gradient(ellipse 70% 90% at center, rgba(5,7,22,0) 0%, rgba(5,7,22,0) 45%, rgba(5,7,22,0.85) 90%, rgba(5,7,22,1) 100%)';
 
-const AURORA_OVERLAY =
-  'radial-gradient(ellipse 70% 90% at center, rgba(6,4,10,0) 0%, rgba(6,4,10,0) 45%, rgba(6,4,10,0.85) 90%, rgba(6,4,10,1) 100%)';
-
 /**
- * Very light corner darken for the clouds artwork so the HUD chrome (timer,
- * menu button, undo) keeps enough contrast, without muting the piece's
- * pastel center where the cube lives.
+ * Very light corner darken for the pastel-cloud artwork so the HUD chrome
+ * (timer, menu button, undo) keeps enough contrast, without muting the
+ * piece's bright center where the cube lives.
  */
 const CLOUDS_OVERLAY =
   'radial-gradient(ellipse 85% 105% at center, rgba(14,10,18,0) 0%, rgba(14,10,18,0) 60%, rgba(14,10,18,0.45) 100%)';
+
+/**
+ * Stronger corner darken for the vibrant "melty" pieces — they're already
+ * high contrast and highly saturated across the whole frame, so the outer
+ * ~25% needs meaningful darken to keep HUD text and the cube's black-plastic
+ * body legible.
+ */
+const MELTY_OVERLAY =
+  'radial-gradient(ellipse 70% 90% at center, rgba(10,6,14,0) 0%, rgba(10,6,14,0) 45%, rgba(10,6,14,0.72) 92%, rgba(10,6,14,0.88) 100%)';
+
+/**
+ * Photorealistic cloud pieces (Cumulus, Moonrise) sit mid-tone and detailed
+ * across most of the frame. A soft edge falloff to a neutral navy keeps the
+ * artwork readable without any dark ring around it.
+ */
+const REAL_CLOUDS_OVERLAY =
+  'radial-gradient(ellipse 90% 110% at center, rgba(6,10,20,0) 0%, rgba(6,10,20,0) 55%, rgba(6,10,20,0.55) 100%)';
 
 export const BACKGROUNDS: CubeBackground[] = [
   {
@@ -88,28 +102,82 @@ export const BACKGROUNDS: CubeBackground[] = [
     size: 'auto 100%',
   },
   {
-    id: 'aurora',
-    label: 'Aurora',
+    id: 'candy-skyline',
+    label: 'Candy Skyline',
     kind: 'image',
-    color: '#06040a',
-    src: '/backgrounds/aurora.png',
-    overlay: AURORA_OVERLAY,
-    // Source is 816x1456 (portrait). `auto 100%` fills viewport height and
-    // lets the sides letterbox to #06040a (blended by the vignette). On
-    // portrait mobile this shows most of the swirl; on landscape it stays
-    // sharp with wider dark bars on either side.
-    size: 'auto 100%',
+    color: '#1b0a1f',
+    src: '/backgrounds/candy-skyline.png',
+    overlay: MELTY_OVERLAY,
+    // Square 1024x1024 hand-drawn cloudscape with a bright pink center. Cover
+    // keeps the pale hole behind the cube on both portrait and landscape.
+    size: 'cover',
   },
   {
-    id: 'aurora-live',
-    label: 'Aurora Live',
-    kind: 'video',
-    color: '#06040a',
-    // Still-frame poster (shown during the video's initial load and used as
-    // the picker thumbnail so the settings drawer stays snappy).
-    src: '/backgrounds/aurora.png',
-    videoSrc: '/backgrounds/aurora.mp4',
-    overlay: AURORA_OVERLAY,
+    id: 'coral-sunset',
+    label: 'Coral Sunset',
+    kind: 'image',
+    color: '#100a1a',
+    src: '/backgrounds/coral-sunset.png',
+    overlay: MELTY_OVERLAY,
+    // Square 1024x1024. Sunset glow sits high, reef textures below. Cover
+    // centers the horizon roughly behind the cube.
+    size: 'cover',
+  },
+  {
+    id: 'neon-ruins',
+    label: 'Neon Ruins',
+    kind: 'image',
+    color: '#0a0716',
+    src: '/backgrounds/neon-ruins.png',
+    overlay: MELTY_OVERLAY,
+    // Square 1024x1024. Dense magenta + navy chaos across the whole frame,
+    // so it leans hard on MELTY_OVERLAY to keep HUD legibility.
+    size: 'cover',
+  },
+  {
+    id: 'cumulus',
+    label: 'Cumulus',
+    kind: 'image',
+    color: '#0a1220',
+    src: '/backgrounds/cumulus.png',
+    overlay: REAL_CLOUDS_OVERLAY,
+    // Square photoreal cumulus at dusk. `cover` frames the towering cloud
+    // stack roughly behind the cube; overlay is soft to keep the sky natural.
+    size: 'cover',
+  },
+  {
+    id: 'moonrise',
+    label: 'Moonrise',
+    kind: 'image',
+    color: '#050914',
+    src: '/backgrounds/moonrise.png',
+    overlay: REAL_CLOUDS_OVERLAY,
+    // Cinematic moonrise over clouds with a starfield. Cover works well —
+    // the moon lands upper-right and the cloud mass frames the cube center.
+    size: 'cover',
+  },
+  {
+    id: 'moonveil',
+    label: 'Moonveil',
+    kind: 'image',
+    color: '#0a0e1c',
+    src: '/backgrounds/moonveil.png',
+    overlay: REAL_CLOUDS_OVERLAY,
+    // Native portrait 1520x3200. `contain` shows the WHOLE image at any
+    // viewport rather than cropping into a slice — matches portrait mobile
+    // near-perfectly, letterboxes to `color` on landscape / tablet.
+    size: 'contain',
+  },
+  {
+    id: 'pagoda-mist',
+    label: 'Pagoda Mist',
+    kind: 'image',
+    color: '#0e131f',
+    src: '/backgrounds/pagoda-mist.png',
+    overlay: REAL_CLOUDS_OVERLAY,
+    // Native portrait 1520x3200. `contain` keeps the full composition
+    // visible; near-full-bleed on portrait mobile.
+    size: 'contain',
   },
 ];
 

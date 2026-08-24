@@ -11,12 +11,12 @@ import { OnboardingCoach } from './components/HUD/OnboardingCoach';
 import { AlgorithmToast } from './components/HUD/AlgorithmToast';
 import { RotationTray } from './components/HUD/RotationTray';
 import { MilestoneChips } from './components/HUD/MilestoneChips';
-import { SettingsPanel } from './components/HUD/SettingsPanel';
 import { DrillOverlay } from './components/HUD/DrillOverlay';
 import { MoveReadout } from './components/HUD/MoveReadout';
 import { MenuButton } from './components/HUD/MenuButton';
 import { UndoButton } from './components/HUD/UndoButton';
 import { PauseMenu } from './components/HUD/PauseMenu';
+import { ExitConfirmModal } from './components/HUD/ExitConfirmModal';
 import { LevelSelect } from './components/LevelSelect/LevelSelect';
 import { DailyLanding } from './components/DailyLanding/DailyLanding';
 import { AlgorithmsPanel } from './components/Algorithms/AlgorithmsPanel';
@@ -36,6 +36,17 @@ import { resolveBackground, type CubeBackground } from './cube/backgrounds';
  * they're ready before the first move fires.
  */
 export default function App() {
+  return (
+    <>
+      <AppRoutes />
+      {/* Mounted at the very top so its history sentinel survives every
+          route/mount change below (sign-in → menu → level). */}
+      <ExitConfirmModal />
+    </>
+  );
+}
+
+function AppRoutes() {
   useDevKeyboard();
   useEffect(() => {
     initAudio();
@@ -149,7 +160,6 @@ export default function App() {
       <GameHUD.SolvedOverlaySlot />
       <ObjectiveCompleteOverlay />
       <PauseMenu />
-      <SettingsPanel />
     </div>
   );
 }
