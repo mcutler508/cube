@@ -16,6 +16,7 @@ import {
   resolveReticleStyle,
   RETICLE_ANIM,
 } from '../../cube/reticleStyles';
+import { getStickerMap, getStickerRoughnessMap } from '../../cube/themeTextures';
 import { getCenterLabelTexture } from '../../cube/centerLabels';
 import { useGameStore } from '../../store/gameStore';
 import { dragController } from '../../animation/dragController';
@@ -52,6 +53,9 @@ const TAU = Math.PI * 2;
  * language stays consistent across the app.
  */
 const HINT_EMISSIVE = new THREE.Color('#ffbf3b');
+
+/** Reused white constant for map-driven themes (see `materialColor` below). */
+const WHITE = new THREE.Color(0xffffff);
 
 /** Scan-sweep geometry (in world units, derived from the mockup values). */
 const SWEEP_SEG_LEN = SIZE * 0.08;
@@ -102,11 +106,42 @@ export function Sticker({ side, highlighted = false, centerLabel = null }: Stick
     anisotropyRotation,
     specularIntensity,
     specularColor,
+    transmission = 0,
+    thickness = 0,
+    attenuationDistance = Infinity,
+    baseEmissiveIntensity = 0,
   } = theme.material;
   const reticleColor = theme.reticle.color;
   const reticleBase = RETICLE_EMISSIVE_BASE * theme.reticle.intensityScale;
   const reticlePeak = RETICLE_EMISSIVE_PEAK * theme.reticle.intensityScale;
   const color = useMemo(() => new THREE.Color(hex), [hex]);
+
+  // Per-theme optional maps. Graffiti provides a per-face artwork map;
+  // Frosted provides a shared low-freq noise as the roughness map. When a
+  // color `map` is present we tint by white so the texture's own colors
+  // drive the render instead of being multiplied by the swatch color.
+  const roughnessMap = useMemo(
+    () => getStickerRoughnessMap(theme.id),
+    [theme.id],
+  );
+  const baseColorMap = useMemo(
+    () => getStickerMap(theme.id, side),
+    [theme.id, side],
+  );
+  // For map-driven themes, clone with a random UV crop per sticker so the 9
+  // stickers on the same face each show a different chunk of the face-wide
+  // artwork. Constrained so offset + repeat stays within [0, 1] and no wrap
+  // seam appears inside a sticker.
+  const colorMap = useMemo(() => {
+    if (!baseColorMap) return null;
+    const clone = baseColorMap.clone();
+    const repeat = 0.42;
+    const maxOffset = 1 - repeat;
+    clone.offset.set(Math.random() * maxOffset, Math.random() * maxOffset);
+    clone.repeat.set(repeat, repeat);
+    return clone;
+  }, [baseColorMap]);
+  const materialColor = colorMap ? WHITE : color;
   const materialRef = useRef<THREE.MeshPhysicalMaterial>(null);
   const reticleMatRef = useRef<THREE.MeshStandardMaterial>(null);
   const reticleMeshRef = useRef<THREE.Mesh>(null);
@@ -136,15 +171,19 @@ export function Sticker({ side, highlighted = false, centerLabel = null }: Stick
     const t = clock.getElapsedTime();
     const dragging = dragController.isActive();
 
-    // --- Sticker body (hint highlight only) ---
+    // --- Sticker body (hint highlight, and per-theme idle glow) ---
     const mat = materialRef.current;
     if (mat) {
       if (highlighted) {
         const w = 0.5 + 0.5 * Math.sin(t * 5.2);
         mat.emissive.copy(HINT_EMISSIVE);
         mat.emissiveIntensity = 0.55 + w * 0.85;
-      } else if (mat.emissiveIntensity !== 0) {
-        mat.emissiveIntensity = 0;
+      } else {
+        // Idle: fall back to the theme's baseEmissiveIntensity, tinted with
+        // the sticker's face color. Themes without a base glow (baseEmissive
+        // === 0) get zero intensity, matching the original behavior.
+        mat.emissive.copy(color);
+        mat.emissiveIntensity = baseEmissiveIntensity;
       }
     }
 
@@ -200,8 +239,10 @@ export function Sticker({ side, highlighted = false, centerLabel = null }: Stick
         <meshPhysicalMaterial
           key={theme.id}
           ref={materialRef}
-          color={color}
+          color={materialColor}
+          map={colorMap}
           roughness={roughness}
+          roughnessMap={roughnessMap}
           metalness={metalness}
           envMapIntensity={envMapIntensity}
           clearcoat={clearcoat}
@@ -216,6 +257,12 @@ export function Sticker({ side, highlighted = false, centerLabel = null }: Stick
           anisotropyRotation={anisotropyRotation}
           specularIntensity={specularIntensity}
           specularColor={specularColor}
+          transmission={transmission}
+          thickness={thickness}
+          attenuationDistance={attenuationDistance}
+          attenuationColor={color}
+          emissive={color}
+          emissiveIntensity={baseEmissiveIntensity}
         />
       </RoundedBox>
       {/**

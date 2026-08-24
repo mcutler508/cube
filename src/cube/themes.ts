@@ -48,6 +48,23 @@ export interface ThemeMaterial {
    *  brightness independently of clearcoat. */
   specularIntensity: number;
   specularColor: string;
+  /** Light transmission through the sticker body (0 = opaque, 1 = fully
+   *  transparent glass). Drives the frosted-glass look. Attenuation color
+   *  is derived from the sticker's base color so light that passes through
+   *  picks up the face tint. */
+  transmission?: number;
+  /** Effective body thickness for transmission, in world units. Larger =
+   *  more attenuation (deeper tint). Only meaningful when transmission > 0. */
+  thickness?: number;
+  /** Distance over which transmitted light is fully absorbed by the base
+   *  color. Smaller = more saturated color. Only meaningful when
+   *  transmission > 0. Defaults to Infinity (no absorption). */
+  attenuationDistance?: number;
+  /** Default emissive intensity applied when the sticker is idle (not the
+   *  animated hint pulse). Used by "glowing" themes like frosted glass to
+   *  give the sticker an inner light source — the emissive color is the
+   *  sticker's own face color, so each face glows in its own hue. */
+  baseEmissiveIntensity?: number;
 }
 
 /** Per-theme reticle (direction indicator) tint. The reticle overlay is a
@@ -164,6 +181,93 @@ export const THEMES: readonly CubeTheme[] = [
       specularColor: '#eaf5ff',
     },
     reticle: { color: '#ffffff', intensityScale: 0.35 },
+  },
+  {
+    // Frosted glass — real light transmission (0.82) so the sticker body
+    // reads as a translucent wafer rather than a painted plate. Attenuation
+    // through the base color gives every face its tint from the inside out.
+    // Roughness 0.38 + a low-frequency noise `roughnessMap` (see
+    // themeTextures.ts) breaks up highlights the way sandblasted glass does.
+    // Palette is desaturated jewel tones — the transmission needs headroom;
+    // saturated Rubik's colors would come out muddy through the diffusion.
+    id: 'frosted',
+    name: 'Frosted Glass',
+    colors: {
+      up: '#f0f4ee',
+      down: '#e8c765',
+      front: '#5aa88a',
+      back: '#4a7ea8',
+      left: '#d88a68',
+      right: '#c85a70',
+    },
+    material: {
+      // Rough, low-reflection surface so the base material reads as diffuse
+      // frost, not lacquer. The mirror-y look came from cranked
+      // envMap/clearcoat; both stripped back. `sheen` adds the soft fabric
+      // bloom that real sandblasted glass has when grazing light hits it.
+      roughness: 0.55,
+      metalness: 0,
+      envMapIntensity: 0.35,
+      clearcoat: 0,
+      clearcoatRoughness: 1,
+      iridescence: 0,
+      iridescenceIOR: 1.3,
+      iridescenceThicknessRange: [100, 400],
+      sheen: 0.5,
+      sheenColor: '#ffffff',
+      ior: 1.45,
+      anisotropy: 0,
+      anisotropyRotation: 0,
+      specularIntensity: 0.4,
+      specularColor: '#ffffff',
+      // Mild transmission so the material reads as glass, not paint. Kept
+      // moderate because what's behind each sticker is the black cubie body
+      // — high transmission would just show a dark tinted hole.
+      transmission: 0.55,
+      thickness: 0.4,
+      attenuationDistance: 0.35,
+      // The actual "glow" — each sticker emits its own face color at low
+      // intensity, so it reads as frosted glass with a colored LED behind
+      // it. The frost roughness diffuses the emissive into a soft bloom.
+      baseEmissiveIntensity: 0.55,
+    },
+    reticle: { color: '#ffffff', intensityScale: 1.4 },
+  },
+  {
+    // Graffiti — each face is a densely-painted 1024² "wall" of tags, drips,
+    // and spray speckles over the vibrant face color (see themeTextures.ts).
+    // Each sticker samples a random ~42% crop of its face texture so no two
+    // stickers on the same face look identical, while the face color still
+    // dominates every crop. Matte surface (roughness 0.78, no clearcoat) so
+    // it reads as spray paint on concrete, not lacquered plastic.
+    id: 'graffiti',
+    name: 'Graffiti',
+    colors: {
+      up: '#f0efe8',
+      down: '#ffcf1a',
+      front: '#12a05a',
+      back: '#1f5fd6',
+      left: '#f57a1e',
+      right: '#e5303f',
+    },
+    material: {
+      roughness: 0.78,
+      metalness: 0,
+      envMapIntensity: 0.55,
+      clearcoat: 0,
+      clearcoatRoughness: 1,
+      iridescence: 0,
+      iridescenceIOR: 1.3,
+      iridescenceThicknessRange: [100, 400],
+      sheen: 0.2,
+      sheenColor: '#a09080',
+      ior: 1.4,
+      anisotropy: 0,
+      anisotropyRotation: 0,
+      specularIntensity: 0.6,
+      specularColor: '#ffffff',
+    },
+    reticle: { color: '#ffffff', intensityScale: 1.2 },
   },
 ];
 

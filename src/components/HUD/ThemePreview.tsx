@@ -1,5 +1,15 @@
 import type { CubeTheme } from '../../cube/themes';
 
+type PreviewVariant = 'matte' | 'glass' | 'iridescent' | 'frosted' | 'graffiti';
+
+function resolveVariant(theme: CubeTheme): PreviewVariant {
+  if (theme.id === 'graffiti') return 'graffiti';
+  if ((theme.material.transmission ?? 0) > 0.5) return 'frosted';
+  if (theme.material.clearcoat > 0.5 && theme.material.roughness < 0.1) return 'glass';
+  if (theme.material.iridescence >= 0.75) return 'iridescent';
+  return 'matte';
+}
+
 /**
  * A pure CSS preview card for a cube theme. Deliberately does NOT mount the
  * Three.js cube — the picker sits in Settings and rendering a real WebGL scene
@@ -22,6 +32,7 @@ export function ThemePreview({
   const CUBE = 72;
   const HALF = CUBE / 2;
   const c = theme.colors;
+  const variant = resolveVariant(theme);
 
   return (
     <button
@@ -65,9 +76,9 @@ export function ThemePreview({
             transform: 'rotateX(-26deg) rotateY(-34deg)',
           }}
         >
-          <MiniFace transform={`rotateX(90deg) translateZ(${HALF}px)`} color={c.up} brightness={1.1} material={theme.material} />
-          <MiniFace transform={`translateZ(${HALF}px)`} color={c.front} brightness={1} material={theme.material} />
-          <MiniFace transform={`rotateY(90deg) translateZ(${HALF}px)`} color={c.right} brightness={0.66} material={theme.material} />
+          <MiniFace transform={`rotateX(90deg) translateZ(${HALF}px)`} color={c.up} brightness={1.1} variant={variant} />
+          <MiniFace transform={`translateZ(${HALF}px)`} color={c.front} brightness={1} variant={variant} />
+          <MiniFace transform={`rotateY(90deg) translateZ(${HALF}px)`} color={c.right} brightness={0.66} variant={variant} />
         </div>
       </div>
 
@@ -91,52 +102,64 @@ function MiniFace({
   transform,
   color,
   brightness,
-  material,
+  variant,
 }: {
   transform: string;
   color: string;
   brightness: number;
-  material: CubeTheme['material'];
+  variant: PreviewVariant;
 }) {
-  // Derive the face treatment from the same material tokens the real 3D
-  // sticker consumes so the preview card previews the actual look. Three
-  // visibly distinct treatments, dialed hard:
-  //   - Glass (clearcoat=1, roughness<0.1): tight top highlight, bright
-  //     bottom bounce, wet rim glow.
-  //   - Iridescent (iridescence>=0.75): full prismatic conic overlay +
-  //     anisotropic diagonal streak + amber rim.
+  // Five distinct treatments so cards in the picker read as different
+  // *materials*, not just different colors:
+  //   - Glass: tight top highlight + wet rim glow.
+  //   - Iridescent: prismatic conic overlay + amber rim.
+  //   - Frosted: broad milky bloom + soft inner-rim glow (light diffusion).
+  //   - Graffiti: face color + tiny fake tag stamp + spray speckles.
   //   - Matte plastic: soft sheen only, prominent seam.
-  const glassy = material.clearcoat > 0.5 && material.roughness < 0.1;
-  const iridescent = material.iridescence >= 0.75;
-
   const layers: string[] = [];
 
-  if (glassy) {
+  if (variant === 'glass') {
     layers.push('radial-gradient(ellipse at 30% 15%, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.35) 12%, rgba(255,255,255,0) 32%)');
     layers.push('linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0) 22%)');
     layers.push('linear-gradient(0deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0) 30%)');
-  } else if (iridescent) {
+  } else if (variant === 'iridescent') {
     layers.push('linear-gradient(135deg, rgba(255,255,255,0) 20%, rgba(255,255,255,0.55) 40%, rgba(255,255,255,0) 60%)');
     layers.push('conic-gradient(from 210deg at 35% 25%, rgba(255,90,180,0.55), rgba(90,220,255,0.5), rgba(255,230,120,0.55), rgba(180,90,255,0.55), rgba(255,90,180,0.55))');
     layers.push('linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0) 30%)');
+  } else if (variant === 'frosted') {
+    // Inner-glow read: broad centered bloom (as if a colored LED is behind
+    // the frost) + a bright milky top-corner sheen. Face color remains
+    // visible around the edges so it doesn't wash to white.
+    layers.push('radial-gradient(circle at 50% 55%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.20) 35%, rgba(255,255,255,0) 65%)');
+    layers.push('radial-gradient(circle at 30% 20%, rgba(255,255,255,0.75) 0%, rgba(255,255,255,0.20) 20%, rgba(255,255,255,0) 45%)');
+    layers.push('linear-gradient(180deg, rgba(255,255,255,0.20) 0%, rgba(255,255,255,0) 40%, rgba(0,0,0,0.06) 100%)');
+  } else if (variant === 'graffiti') {
+    // Fake spray speckles + a suggestion of a drip; keeps most of the face
+    // color visible per user constraint.
+    layers.push('radial-gradient(circle at 25% 30%, rgba(0,0,0,0.35) 0 3%, transparent 4%)');
+    layers.push('radial-gradient(circle at 70% 40%, rgba(255,255,255,0.45) 0 2.5%, transparent 3.5%)');
+    layers.push('radial-gradient(circle at 55% 75%, rgba(0,0,0,0.30) 0 3%, transparent 4%)');
+    layers.push('linear-gradient(180deg, rgba(255,255,255,0.20) 0%, rgba(255,255,255,0) 30%)');
   } else {
     layers.push('linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 38%)');
   }
 
-  const seamShadow = glassy
-    ? 'inset 0 -4px 8px rgba(0,0,0,0.22)'
-    : iridescent
-    ? 'inset 0 -3px 6px rgba(0,0,0,0.20)'
+  const seamShadow =
+    variant === 'glass' ? 'inset 0 -4px 8px rgba(0,0,0,0.22)'
+    : variant === 'iridescent' ? 'inset 0 -3px 6px rgba(0,0,0,0.20)'
+    : variant === 'frosted' ? 'inset 0 0 12px rgba(255,255,255,0.35)'
+    : variant === 'graffiti' ? 'inset 0 -5px 9px rgba(0,0,0,0.35)'
     : 'inset 0 -6px 10px rgba(0,0,0,0.4)';
-  const border = glassy
-    ? 'rgba(255,255,255,0.4)'
-    : iridescent
-    ? 'rgba(255,255,255,0.25)'
+  const border =
+    variant === 'glass' ? 'rgba(255,255,255,0.4)'
+    : variant === 'iridescent' ? 'rgba(255,255,255,0.25)'
+    : variant === 'frosted' ? 'rgba(255,255,255,0.55)'
+    : variant === 'graffiti' ? 'rgba(0,0,0,0.55)'
     : 'rgba(0,0,0,0.45)';
-  const rim = glassy
-    ? ', 0 0 14px rgba(180,230,255,0.55), 0 0 4px rgba(255,255,255,0.4)'
-    : iridescent
-    ? ', 0 0 10px rgba(255,160,120,0.45)'
+  const rim =
+    variant === 'glass' ? ', 0 0 14px rgba(180,230,255,0.55), 0 0 4px rgba(255,255,255,0.4)'
+    : variant === 'iridescent' ? ', 0 0 10px rgba(255,160,120,0.45)'
+    : variant === 'frosted' ? ', 0 0 16px rgba(255,255,255,0.35)'
     : '';
 
   return (
