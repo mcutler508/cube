@@ -5,6 +5,11 @@ const STORAGE_KEY = 'cube:player:v1';
 export interface Player {
   id: string;
   name: string;
+  /** True once the account has cleared the first-run tutorial (learn-01,
+   *  learn-02). Persisted per-player in Supabase (see the
+   *  20260823_add_tutorial_completed.sql migration) so a fresh account on
+   *  a browser that already ran the tutorial still gets routed through it. */
+  tutorialCompleted: boolean;
 }
 
 interface StoredPayload {
@@ -17,6 +22,7 @@ interface PlayerStore {
   hydrated: boolean;
   hydrate: () => void;
   setPlayer: (player: Player) => void;
+  markTutorialCompleted: () => void;
   signOut: () => void;
 }
 
@@ -37,7 +43,13 @@ function readStored(): Player | null {
   try {
     const parsed = JSON.parse(raw) as StoredPayload;
     if (parsed.version !== 1 || !parsed.player?.id || !parsed.player?.name) return null;
-    return parsed.player;
+    // tutorialCompleted was added later; old cached payloads default to
+    // false so the app re-verifies against Supabase on next sign-in.
+    return {
+      id: parsed.player.id,
+      name: parsed.player.name,
+      tutorialCompleted: parsed.player.tutorialCompleted ?? false,
+    };
   } catch {
     return null;
   }
@@ -67,6 +79,13 @@ export const usePlayerStore = create<PlayerStore>((set) => ({
   setPlayer: (player) => {
     writeStored(player);
     set({ player });
+  },
+  markTutorialCompleted: () => {
+    const current = readStored();
+    if (!current) return;
+    const next: Player = { ...current, tutorialCompleted: true };
+    writeStored(next);
+    set({ player: next });
   },
   signOut: () => {
     writeStored(null);

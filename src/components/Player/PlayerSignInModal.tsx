@@ -58,7 +58,11 @@ export function PlayerSignInModal({ initialMode = 'signin', onClose }: Props) {
           setError(signUpErrorMessage(result.error));
           return;
         }
-        setPlayer({ id: result.player!.id, name: result.player!.name });
+        setPlayer({
+          id: result.player!.id,
+          name: result.player!.name,
+          tutorialCompleted: result.player!.tutorial_completed,
+        });
         onClose?.();
       } else {
         const result = await signIn(handle, passcode);
@@ -66,7 +70,11 @@ export function PlayerSignInModal({ initialMode = 'signin', onClose }: Props) {
           setError(signInErrorMessage(result.error));
           return;
         }
-        setPlayer({ id: result.player!.id, name: result.player!.name });
+        setPlayer({
+          id: result.player!.id,
+          name: result.player!.name,
+          tutorialCompleted: result.player!.tutorial_completed,
+        });
         onClose?.();
       }
     } finally {

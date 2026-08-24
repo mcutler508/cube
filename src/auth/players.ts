@@ -8,6 +8,7 @@ export interface PlayerRow {
   email: string | null;
   created_at: string;
   updated_at: string;
+  tutorial_completed: boolean;
 }
 
 export type SignUpError =
@@ -75,7 +76,7 @@ export async function signUp(
     const { data, error } = await client
       .from('players')
       .insert({ id, name: handle, email: trimmedEmail, passcode_hash })
-      .select('id, name, email, created_at, updated_at')
+      .select('id, name, email, created_at, updated_at, tutorial_completed')
       .single();
     if (error) {
       const code = (error as { code?: string }).code;
@@ -96,6 +97,25 @@ export async function signUp(
   }
 }
 
+/**
+ * Best-effort write: flag the account as having finished the first-run
+ * tutorial. Silent on any failure — the local player-store flag is the
+ * canonical source of truth within this session, and the next sign-in will
+ * re-fetch. Called once the player clears learn-02.
+ */
+export async function markTutorialCompleted(playerId: string): Promise<void> {
+  const client = getSupabase();
+  if (!client) return;
+  try {
+    await client
+      .from('players')
+      .update({ tutorial_completed: true })
+      .eq('id', playerId);
+  } catch (err) {
+    console.warn('[players] markTutorialCompleted threw', err);
+  }
+}
+
 export async function signIn(name: string, passcode: string): Promise<SignInResult> {
   const client = getSupabase();
   if (!client) return { ok: false, error: 'unconfigured' };
@@ -107,7 +127,7 @@ export async function signIn(name: string, passcode: string): Promise<SignInResu
   try {
     const { data, error } = await client
       .from('players')
-      .select('id, name, email, created_at, updated_at, passcode_hash')
+      .select('id, name, email, created_at, updated_at, tutorial_completed, passcode_hash')
       .eq('name_lower', handle.toLowerCase())
       .maybeSingle();
     if (error) {

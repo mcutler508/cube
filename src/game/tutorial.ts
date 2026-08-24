@@ -1,6 +1,7 @@
 import { findLevel } from './levels/catalog';
 import { getLevelBest } from './persistence';
 import type { Level } from './levels/types';
+import type { Player } from '../store/playerStore';
 
 /**
  * Ordered list of levels a brand-new user is force-fed before the main game
@@ -20,10 +21,24 @@ export function isFirstRunLevelId(id: string): id is FirstRunLevelId {
 
 /**
  * The next tutorial level the player still owes us, or null once they've
- * cleared both. Uses the PB table as the source of truth: any completion
- * (even via level-select replay after wipe) counts.
+ * cleared both.
+ *
+ * When a player is signed in, the account's tutorial_completed flag is the
+ * canonical source of truth — a brand-new account always sees the tutorial,
+ * even in a browser that already ran it under a different account.
+ *
+ * When there's no player (auth-less builds), we fall back to the local PB
+ * table so users on offline / dev builds can still bypass a completed
+ * tutorial across page reloads.
  */
-export function nextRequiredTutorialLevel(): Level | null {
+export function nextRequiredTutorialLevel(player: Player | null): Level | null {
+  if (player) {
+    if (player.tutorialCompleted) return null;
+    // Fresh account — always route through level 1. The Continue button
+    // chains onward from there; local PB is deliberately ignored so a fresh
+    // account gets a fresh onboarding.
+    return findLevel(FIRST_RUN_LEVEL_IDS[0]);
+  }
   for (const id of FIRST_RUN_LEVEL_IDS) {
     if (!getLevelBest(id)) return findLevel(id);
   }

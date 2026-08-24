@@ -11,6 +11,8 @@ import {
 import { nextLevel } from '../../game/levels/catalog';
 import { nextTutorialLevelAfter } from '../../game/tutorial';
 import { useGameStore } from '../../store/gameStore';
+import { usePlayerStore } from '../../store/playerStore';
+import { markTutorialCompleted } from '../../auth/players';
 import { Stars } from './Stars';
 import { formatElapsed } from './useLiveTimer';
 
@@ -166,9 +168,16 @@ function advanceTutorial(currentLevelId: string): void {
   const nextTutorial = nextTutorialLevelAfter(currentLevelId);
   if (nextTutorial) {
     loadTutorialLevel(nextTutorial);
-  } else {
-    exitToMenu();
+    return;
   }
+  // Finished the last tutorial level. Persist completion to the account
+  // (best-effort — no need to await; the local flag is set optimistically
+  // below so the tutorial gate on the next mount correctly skips) then land
+  // on the main menu.
+  const player = usePlayerStore.getState().player;
+  usePlayerStore.getState().markTutorialCompleted();
+  if (player) void markTutorialCompleted(player.id);
+  exitToMenu();
 }
 
 // Re-export for consumers that only need the stars glyph elsewhere.

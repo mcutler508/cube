@@ -16,7 +16,12 @@ import {
   resolveReticleStyle,
   RETICLE_ANIM,
 } from '../../cube/reticleStyles';
-import { getStickerMap, getStickerRoughnessMap } from '../../cube/themeTextures';
+import {
+  getStickerMap,
+  getStickerRoughnessMap,
+  getStickerNormalMap,
+  getStickerAnisotropyMap,
+} from '../../cube/themeTextures';
 import { getCenterLabelTexture } from '../../cube/centerLabels';
 import { useGameStore } from '../../store/gameStore';
 import { dragController } from '../../animation/dragController';
@@ -122,6 +127,14 @@ export function Sticker({ side, highlighted = false, centerLabel = null }: Stick
   // drive the render instead of being multiplied by the swatch color.
   const roughnessMap = useMemo(
     () => getStickerRoughnessMap(theme.id),
+    [theme.id],
+  );
+  const normalMap = useMemo(
+    () => getStickerNormalMap(theme.id),
+    [theme.id],
+  );
+  const anisotropyMap = useMemo(
+    () => getStickerAnisotropyMap(theme.id),
     [theme.id],
   );
   const baseColorMap = useMemo(
@@ -241,6 +254,8 @@ export function Sticker({ side, highlighted = false, centerLabel = null }: Stick
           ref={materialRef}
           color={materialColor}
           map={colorMap}
+          normalMap={normalMap}
+          anisotropyMap={anisotropyMap}
           roughness={roughness}
           roughnessMap={roughnessMap}
           metalness={metalness}

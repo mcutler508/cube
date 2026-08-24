@@ -26,7 +26,6 @@ export function loadTutorialLevel(level: Level): void {
 }
 
 function loadLevelInternal(level: Level, tutorial: boolean): void {
-  console.log('[tutorial] loadLevelInternal', level.id, 'tutorial=', tutorial);
   // Force-reset the move pipeline. We're about to snap the cube back to
   // solved and (optionally) apply a fresh scramble — any leftover queued
   // moves or a stuck busy flag from a prior session would only corrupt the

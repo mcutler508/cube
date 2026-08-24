@@ -269,6 +269,49 @@ export const THEMES: readonly CubeTheme[] = [
     },
     reticle: { color: '#ffffff', intensityScale: 1.2 },
   },
+  {
+    // Holographic — peacock-foil sticker material. Three layers doing the
+    // work together (see themeTextures.ts):
+    //   1. normalMap = fine radial grooves so the surface has visible "hair
+    //      lines" that catch light like real holo cards / trading foils.
+    //   2. anisotropyMap = per-pixel tangent-to-radius direction, so the
+    //      stretched specular highlight sweeps in concentric arcs across
+    //      the sticker as the cube rotates instead of forming a single
+    //      linear streak.
+    //   3. iridescence maxed out with a wide thickness range so the color
+    //      sweeps through the full visible spectrum as view angle changes.
+    // Base colors are the classic muted palette — high metalness would
+    // wash saturated hues into gray, so we keep face identity by pushing
+    // through the iridescent shift.
+    id: 'holographic',
+    name: 'Holographic',
+    colors: {
+      up: '#f8f8f2',
+      down: '#f6c000',
+      front: '#2a9d5c',
+      back: '#1e5fb8',
+      left: '#f77f00',
+      right: '#d62828',
+    },
+    material: {
+      roughness: 0.28,
+      metalness: 0.85,
+      envMapIntensity: 2.2,
+      clearcoat: 0.4,
+      clearcoatRoughness: 0.12,
+      iridescence: 1.0,
+      iridescenceIOR: 1.85,
+      iridescenceThicknessRange: [100, 850],
+      sheen: 0,
+      sheenColor: '#ffffff',
+      ior: 1.6,
+      anisotropy: 1.0,
+      anisotropyRotation: 0,
+      specularIntensity: 1.0,
+      specularColor: '#ffffff',
+    },
+    reticle: { color: '#ffffff', intensityScale: 1.1 },
+  },
 ];
 
 /** Resolve a themeId to a theme object, falling back to the first theme

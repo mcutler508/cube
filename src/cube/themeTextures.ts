@@ -211,6 +211,114 @@ function buildGraffitiFace(side: StickerSide): THREE.CanvasTexture {
 }
 
 // ---------------------------------------------------------------------------
+// Holographic — the "peacock foil" sticker look. Two maps working together:
+//   - normalMap: fine radial grooves radiating from the sticker's center,
+//     giving the surface visible directional texture (the "hair lines" you
+//     see on real holo stickers / trading cards).
+//   - anisotropyMap: per-pixel direction of maximum specular stretch, set
+//     to the tangent of the radial pattern so highlights sweep around in
+//     concentric arcs as the cube rotates.
+// Combined with high iridescence in the theme material, the result is a
+// prismatic rainbow shift that follows the grooves.
+// ---------------------------------------------------------------------------
+
+function buildHoloNormal(): THREE.CanvasTexture {
+  const size = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('themeTextures: 2d canvas context unavailable');
+  const img = ctx.createImageData(size, size);
+
+  const cx = size / 2;
+  const cy = size / 2;
+  // Number of angular grooves around the full circle. Higher = finer hair.
+  const grooves = 96;
+  // Wave modulation strength — organic wobble in the otherwise-perfect
+  // sunburst so the pattern doesn't read as too mechanical.
+  const wobble = 0.7;
+
+  const heightAt = (x: number, y: number): number => {
+    const dx = x - cx;
+    const dy = y - cy;
+    const r = Math.sqrt(dx * dx + dy * dy);
+    const angle = Math.atan2(dy, dx);
+    // Fine radial ridges + slow radial modulation so it doesn't strobe.
+    return (
+      0.5 * Math.sin(angle * grooves + Math.sin(r * 0.06) * wobble) +
+      0.15 * Math.sin(r * 0.9)
+    );
+  };
+
+  const strength = 12;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const hL = heightAt(x - 1, y);
+      const hR = heightAt(x + 1, y);
+      const hU = heightAt(x, y - 1);
+      const hD = heightAt(x, y + 1);
+      const dhdx = (hR - hL) * strength;
+      const dhdy = (hD - hU) * strength;
+      const nx = -dhdx;
+      const ny = -dhdy;
+      const nz = 1;
+      const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+      const i = (y * size + x) * 4;
+      img.data[i] = ((nx / len) * 0.5 + 0.5) * 255;
+      img.data[i + 1] = ((ny / len) * 0.5 + 0.5) * 255;
+      img.data[i + 2] = ((nz / len) * 0.5 + 0.5) * 255;
+      img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(canvas);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.needsUpdate = true;
+  return t;
+}
+
+function buildHoloAnisotropy(): THREE.CanvasTexture {
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('themeTextures: 2d canvas context unavailable');
+  const img = ctx.createImageData(size, size);
+  const cx = size / 2;
+  const cy = size / 2;
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const dx = x - cx;
+      const dy = y - cy;
+      const r = Math.sqrt(dx * dx + dy * dy);
+      // Anisotropy vector = tangent to the radial pattern (perpendicular to
+      // the radius). Degenerate case at exact center: pick an arbitrary
+      // stable direction so we don't ship NaN pixels.
+      let tx: number;
+      let ty: number;
+      if (r < 1) {
+        tx = 1;
+        ty = 0;
+      } else {
+        tx = -dy / r;
+        ty = dx / r;
+      }
+      const i = (y * size + x) * 4;
+      img.data[i] = (tx * 0.5 + 0.5) * 255;
+      img.data[i + 1] = (ty * 0.5 + 0.5) * 255;
+      img.data[i + 2] = 255; // full anisotropy strength across the sticker
+      img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(canvas);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.needsUpdate = true;
+  return t;
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -222,6 +330,30 @@ export function getStickerRoughnessMap(themeId: ThemeId): THREE.Texture | null {
   const cached = cache.get(key);
   if (cached) return cached;
   const t = buildFrostedRoughness();
+  cache.set(key, t);
+  return t;
+}
+
+/** Optional normal map for the given theme. Currently only used by the
+ *  holographic theme (fine radial grooves). */
+export function getStickerNormalMap(themeId: ThemeId): THREE.Texture | null {
+  if (themeId !== 'holographic') return null;
+  const key = 'holo-normal';
+  const cached = cache.get(key);
+  if (cached) return cached;
+  const t = buildHoloNormal();
+  cache.set(key, t);
+  return t;
+}
+
+/** Optional anisotropy direction map for the given theme. Currently only
+ *  used by the holographic theme (tangent-to-radius field). */
+export function getStickerAnisotropyMap(themeId: ThemeId): THREE.Texture | null {
+  if (themeId !== 'holographic') return null;
+  const key = 'holo-anisotropy';
+  const cached = cache.get(key);
+  if (cached) return cached;
+  const t = buildHoloAnisotropy();
   cache.set(key, t);
   return t;
 }

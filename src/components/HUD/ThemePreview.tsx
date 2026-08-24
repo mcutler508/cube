@@ -1,9 +1,16 @@
 import type { CubeTheme } from '../../cube/themes';
 
-type PreviewVariant = 'matte' | 'glass' | 'iridescent' | 'frosted' | 'graffiti';
+type PreviewVariant =
+  | 'matte'
+  | 'glass'
+  | 'iridescent'
+  | 'frosted'
+  | 'graffiti'
+  | 'holographic';
 
 function resolveVariant(theme: CubeTheme): PreviewVariant {
   if (theme.id === 'graffiti') return 'graffiti';
+  if (theme.id === 'holographic') return 'holographic';
   if ((theme.material.transmission ?? 0) > 0.5) return 'frosted';
   if (theme.material.clearcoat > 0.5 && theme.material.roughness < 0.1) return 'glass';
   if (theme.material.iridescence >= 0.75) return 'iridescent';
@@ -133,6 +140,14 @@ function MiniFace({
     layers.push('radial-gradient(circle at 50% 55%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.20) 35%, rgba(255,255,255,0) 65%)');
     layers.push('radial-gradient(circle at 30% 20%, rgba(255,255,255,0.75) 0%, rgba(255,255,255,0.20) 20%, rgba(255,255,255,0) 45%)');
     layers.push('linear-gradient(180deg, rgba(255,255,255,0.20) 0%, rgba(255,255,255,0) 40%, rgba(0,0,0,0.06) 100%)');
+  } else if (variant === 'holographic') {
+    // Holo card read: full-spectrum conic sweep + concentric rings of light
+    // hinting at the radial groove structure. Much heavier prismatic color
+    // than the "iridescent" branch since the real theme's iridescence is
+    // maxed and the anisotropy map spreads highlights across the surface.
+    layers.push('conic-gradient(from 30deg at 55% 40%, rgba(255,80,180,0.65), rgba(80,220,255,0.65), rgba(180,255,140,0.65), rgba(255,220,120,0.65), rgba(200,120,255,0.65), rgba(255,80,180,0.65))');
+    layers.push('repeating-radial-gradient(circle at 55% 45%, rgba(255,255,255,0.10) 0 2px, rgba(0,0,0,0) 2px 5px)');
+    layers.push('linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0) 30%)');
   } else if (variant === 'graffiti') {
     // Fake spray speckles + a suggestion of a drip; keeps most of the face
     // color visible per user constraint.
@@ -149,17 +164,20 @@ function MiniFace({
     : variant === 'iridescent' ? 'inset 0 -3px 6px rgba(0,0,0,0.20)'
     : variant === 'frosted' ? 'inset 0 0 12px rgba(255,255,255,0.35)'
     : variant === 'graffiti' ? 'inset 0 -5px 9px rgba(0,0,0,0.35)'
+    : variant === 'holographic' ? 'inset 0 -3px 6px rgba(0,0,0,0.25)'
     : 'inset 0 -6px 10px rgba(0,0,0,0.4)';
   const border =
     variant === 'glass' ? 'rgba(255,255,255,0.4)'
     : variant === 'iridescent' ? 'rgba(255,255,255,0.25)'
     : variant === 'frosted' ? 'rgba(255,255,255,0.55)'
     : variant === 'graffiti' ? 'rgba(0,0,0,0.55)'
+    : variant === 'holographic' ? 'rgba(255,255,255,0.35)'
     : 'rgba(0,0,0,0.45)';
   const rim =
     variant === 'glass' ? ', 0 0 14px rgba(180,230,255,0.55), 0 0 4px rgba(255,255,255,0.4)'
     : variant === 'iridescent' ? ', 0 0 10px rgba(255,160,120,0.45)'
     : variant === 'frosted' ? ', 0 0 16px rgba(255,255,255,0.35)'
+    : variant === 'holographic' ? ', 0 0 12px rgba(200,120,255,0.5), 0 0 4px rgba(120,220,255,0.4)'
     : '';
 
   return (
