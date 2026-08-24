@@ -75,11 +75,15 @@ function AppRoutes() {
   // returns null once both PBs exist.
   const signInSatisfied = !isSupabaseConfigured() || (hydrated && !!player);
   useEffect(() => {
+    console.log('[tutorial] effect', { signInSatisfied, hydrated, hasPlayer: !!player });
     if (!signInSatisfied) return;
-    if (useGameStore.getState().currentLevel) return;
+    const currentLevel = useGameStore.getState().currentLevel;
+    console.log('[tutorial] currentLevel', currentLevel?.id ?? null);
+    if (currentLevel) return;
     const tutorial = nextRequiredTutorialLevel();
+    console.log('[tutorial] nextRequiredTutorialLevel →', tutorial?.id ?? null, 'PBs:', localStorage.getItem('cube:pb:v1'));
     if (tutorial) loadTutorialLevel(tutorial);
-  }, [signInSatisfied]);
+  }, [signInSatisfied, hydrated, player]);
 
   if (isSupabaseConfigured() && hydrated && !player) {
     return <PlayerSignInModal initialMode="signup" />;
