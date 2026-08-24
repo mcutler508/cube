@@ -92,6 +92,15 @@ interface GameStore {
   /** Which landing screen to show when no level is active. */
   menuView: 'daily' | 'learn' | 'algos';
 
+  /**
+   * True while the player is inside the forced first-run tutorial (learn-01
+   * then learn-02). Set by loadTutorialLevel(); cleared by any non-tutorial
+   * loadLevel() or by exitToMenu(). HUD reads this to swap the results-panel
+   * button set and hide the pause-menu "Return to menu" affordance so the
+   * two levels are genuinely enforced. See src/game/tutorial.ts.
+   */
+  isTutorialRun: boolean;
+
   // --- user settings ---
   settings: Settings;
   /** True while the settings panel is open (in-level overlay). */
@@ -123,6 +132,7 @@ interface GameStore {
   requestHint: () => void;
   dismissHint: () => void;
   setMenuView: (view: 'daily' | 'learn' | 'algos') => void;
+  setTutorialRun: (v: boolean) => void;
   setPreviewAlgorithm: (id: string | null) => void;
   setSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
   openSettings: () => void;
@@ -181,6 +191,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   drillState: null,
   drillMisfireAt: null,
   menuView: 'daily',
+  isTutorialRun: false,
   previewAlgorithmId: null,
   settings: loadSettings(),
   isSettingsOpen: false,
@@ -502,6 +513,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   setMenuView: (view) => set({ menuView: view }),
 
+  setTutorialRun: (v) => set({ isTutorialRun: v }),
+
   setPreviewAlgorithm: (id) => set({ previewAlgorithmId: id }),
 
   setSetting: (key, value) => {
@@ -571,6 +584,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       hintTargetAlgorithm: null,
       hintNextMove: null,
       previewAlgorithmId: null,
+      isTutorialRun: false,
     });
   },
 

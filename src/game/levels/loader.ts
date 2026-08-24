@@ -12,6 +12,20 @@ import type { Level } from './types';
  * nicely with the same animation queue and busy-state subscribers.
  */
 export function loadLevel(level: Level): void {
+  loadLevelInternal(level, false);
+}
+
+/**
+ * Load a level as part of the first-run tutorial flow. Same as loadLevel()
+ * but flips the isTutorialRun store flag so downstream HUD (LevelResultPanel,
+ * PauseMenu) can adapt — no skip, no "Return to menu" mid-tutorial. See
+ * src/game/tutorial.ts for the higher-level orchestration.
+ */
+export function loadTutorialLevel(level: Level): void {
+  loadLevelInternal(level, true);
+}
+
+function loadLevelInternal(level: Level, tutorial: boolean): void {
   // Force-reset the move pipeline. We're about to snap the cube back to
   // solved and (optionally) apply a fresh scramble — any leftover queued
   // moves or a stuck busy flag from a prior session would only corrupt the
@@ -22,6 +36,7 @@ export function loadLevel(level: Level): void {
   const store = useGameStore.getState();
   store.reset();
   store.loadLevel(level);
+  store.setTutorialRun(tutorial);
   if (level.setupMoves.length === 0) return;
   store.beginScramble();
   enqueueScrambleMoves(level.setupMoves);

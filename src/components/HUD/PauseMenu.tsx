@@ -18,6 +18,7 @@ import { moveQueue } from '../../animation/moveController';
 export function PauseMenu() {
   const isOpen = useGameStore((s) => s.isPauseMenuOpen);
   const close = useGameStore((s) => s.closePauseMenu);
+  const isTutorialRun = useGameStore((s) => s.isTutorialRun);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -86,7 +87,11 @@ export function PauseMenu() {
         <div className="flex flex-col gap-2">
           <MenuButton onClick={close} label="Resume" primary />
           <MenuButton onClick={onRestart} label="Restart level" />
-          <MenuButton onClick={onExit} label="Return to menu" tone="danger" />
+          {/* Return-to-menu is hidden during the forced first-run tutorial —
+              the two intro levels are enforced, no skip. */}
+          {!isTutorialRun && (
+            <MenuButton onClick={onExit} label="Return to menu" tone="danger" />
+          )}
         </div>
       </div>
       <style>{`

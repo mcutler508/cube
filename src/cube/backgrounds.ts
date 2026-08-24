@@ -163,13 +163,11 @@ export const BACKGROUNDS: CubeBackground[] = [
     color: '#0a0e1c',
     src: '/backgrounds/moonveil.png',
     overlay: REAL_CLOUDS_OVERLAY,
-    // Native portrait 1520x3200 (aspect ~0.475, matches most portrait
-    // phones). `auto 100%` fills viewport height with proportional width
-    // so there's never a horizontal black bar; on typical mobile the
-    // width overflows by only a few pixels, giving an edge-to-edge feel
-    // with negligible side crop. Sharper than `cover` on wider aspects
-    // and never letterboxes on portrait like `contain` does.
-    size: 'auto 100%',
+    // Native portrait 1520x3200 (aspect ~0.475). `cover` fills the
+    // viewport on any orientation: near-zero crop on portrait mobile
+    // (matching aspect), meaningful vertical crop on landscape but never
+    // a black bar. Trades some cropping for guaranteed edge-to-edge.
+    size: 'cover',
   },
   {
     id: 'pagoda-mist',
@@ -178,9 +176,9 @@ export const BACKGROUNDS: CubeBackground[] = [
     color: '#0e131f',
     src: '/backgrounds/pagoda-mist.png',
     overlay: REAL_CLOUDS_OVERLAY,
-    // Native portrait 1520x3200. Same `auto 100%` strategy as Moonveil —
-    // edge-to-edge on portrait mobile, no side letterbox.
-    size: 'auto 100%',
+    // Native portrait 1520x3200. Same `cover` strategy as Moonveil —
+    // edge-to-edge on every orientation.
+    size: 'cover',
   },
 ];
 

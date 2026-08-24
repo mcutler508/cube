@@ -5,9 +5,12 @@ import { getLevelBest, recordCompletion, type LevelBest } from '../../game/persi
 import {
   exitToMenu,
   loadLevel,
+  loadTutorialLevel,
   restartCurrentLevel,
 } from '../../game/levels/loader';
 import { nextLevel } from '../../game/levels/catalog';
+import { nextTutorialLevelAfter } from '../../game/tutorial';
+import { useGameStore } from '../../store/gameStore';
 import { Stars } from './Stars';
 import { formatElapsed } from './useLiveTimer';
 
@@ -51,6 +54,7 @@ export function LevelResultPanel({
   const next = nextLevel(level.id);
   const isFirstEver = previousBest.current === null;
   const showNewBestBanner = updated && !isFirstEver;
+  const isTutorialRun = useGameStore((s) => s.isTutorialRun);
 
   return (
     <div className="pointer-events-auto relative flex w-full max-w-sm flex-col items-center">
@@ -95,12 +99,20 @@ export function LevelResultPanel({
       )}
 
       <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-        <ActionButton onClick={() => exitToMenu()}>Menu</ActionButton>
-        <ActionButton onClick={() => restartCurrentLevel()}>Replay</ActionButton>
-        {showNextButton && next && (
-          <ActionButton primary onClick={() => loadLevel(next)}>
-            Next
+        {isTutorialRun ? (
+          <ActionButton primary onClick={() => advanceTutorial(level.id)}>
+            Continue
           </ActionButton>
+        ) : (
+          <>
+            <ActionButton onClick={() => exitToMenu()}>Menu</ActionButton>
+            <ActionButton onClick={() => restartCurrentLevel()}>Replay</ActionButton>
+            {showNextButton && next && (
+              <ActionButton primary onClick={() => loadLevel(next)}>
+                Next
+              </ActionButton>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -148,6 +160,15 @@ function ActionButton({
       {children}
     </button>
   );
+}
+
+function advanceTutorial(currentLevelId: string): void {
+  const nextTutorial = nextTutorialLevelAfter(currentLevelId);
+  if (nextTutorial) {
+    loadTutorialLevel(nextTutorial);
+  } else {
+    exitToMenu();
+  }
 }
 
 // Re-export for consumers that only need the stars glyph elsewhere.

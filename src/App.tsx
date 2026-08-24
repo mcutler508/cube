@@ -29,6 +29,8 @@ import { usePlayerStore } from './store/playerStore';
 import { isSupabaseConfigured } from './auth/supabaseClient';
 import { PlayerSignInModal } from './components/Player/PlayerSignInModal';
 import { resolveBackground, type CubeBackground } from './cube/backgrounds';
+import { nextRequiredTutorialLevel } from './game/tutorial';
+import { loadTutorialLevel } from './game/levels/loader';
 
 /**
  * Route: when no level is loaded, show the level-select landing. Otherwise
@@ -65,6 +67,20 @@ function AppRoutes() {
   // without env vars skip the gate so the app is still playable offline.
   const player = usePlayerStore((s) => s.player);
   const hydrated = usePlayerStore((s) => s.hydrated);
+
+  // First-run tutorial: brand-new players (empty PB table) are auto-dropped
+  // into learn-01 the moment they clear the sign-in wall. The overlay's
+  // Continue button chains them into learn-02; after learn-02 they land on
+  // the main menu. Runs at most once per install — nextRequiredTutorialLevel
+  // returns null once both PBs exist.
+  const signInSatisfied = !isSupabaseConfigured() || (hydrated && !!player);
+  useEffect(() => {
+    if (!signInSatisfied) return;
+    if (useGameStore.getState().currentLevel) return;
+    const tutorial = nextRequiredTutorialLevel();
+    if (tutorial) loadTutorialLevel(tutorial);
+  }, [signInSatisfied]);
+
   if (isSupabaseConfigured() && hydrated && !player) {
     return <PlayerSignInModal initialMode="signup" />;
   }
