@@ -31,7 +31,7 @@ export function FidgetLanding() {
         className="pointer-events-none absolute bottom-6 left-0 right-0 text-center text-[10px] uppercase tracking-[0.3em] text-white/40"
         style={{ bottom: 'calc(1.5rem + max(env(safe-area-inset-bottom), 0px))' }}
       >
-        Swipe to spin · tap to catch
+        Swipe: spin inner · Two-finger drag: rotate · Two-finger twist: spin outer
       </div>
     </div>
   );

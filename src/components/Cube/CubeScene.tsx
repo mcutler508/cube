@@ -15,8 +15,8 @@ const FOV = 38;
  * scale in Cube.tsx; the 3x3's is ~2.55). Keeping the same visual padding
  * ratio (radius * 1.21 ≈ target) gives us these numbers.
  */
-const TARGET_RADIUS_3X3 = 3.1;
-const TARGET_RADIUS_2X2 = 2.05;
+const TARGET_RADIUS_3X3 = 2.85;
+const TARGET_RADIUS_2X2 = 1.89;
 
 function computeCameraPosition(
   width: number,
