@@ -20,6 +20,7 @@ import { formatElapsed } from '../HUD/useLiveTimer';
 import { MenuBackdrop } from '../HUD/MenuBackdrop';
 import { Stars } from '../HUD/Stars';
 import { PlayerChip } from '../Player/PlayerChip';
+import { isFidgetEnabled } from '../../fidget/flag';
 
 /**
  * Primary landing. Pick your difficulty (Casual / Regular / Full — same daily
@@ -31,6 +32,7 @@ type DailyMode = '3x3' | '2x2';
 
 export function DailyLanding() {
   const setMenuView = useGameStore((s) => s.setMenuView);
+  const fidgetEnabled = useMemo(() => isFidgetEnabled(), []);
   const [mode, setMode] = useState<DailyMode>('3x3');
   const [difficulty, setDifficulty] = useState<DailyDifficulty>('regular');
   const bests = useMemo(() => getAllBests(), []);
@@ -232,6 +234,23 @@ export function DailyLanding() {
             </div>
             <span className="text-white/40">→</span>
           </button>
+          {fidgetEnabled && (
+            <button
+              type="button"
+              onClick={() => setMenuView('fidget')}
+              className="flex w-full items-center justify-between rounded-2xl bg-white/[0.04] px-4 py-4 text-left ring-1 ring-white/10 transition-all hover:bg-white/[0.08] active:scale-[0.99]"
+            >
+              <div>
+                <div className="text-sm font-medium text-white">
+                  Fidget <span className="ml-1 text-[9px] uppercase tracking-[0.22em] text-white/40">Prototype</span>
+                </div>
+                <div className="mt-0.5 text-[10px] uppercase tracking-[0.22em] text-white/40">
+                  Swipe an iridescent cube for a bit
+                </div>
+              </div>
+              <span className="text-white/40">→</span>
+            </button>
+          )}
         </div>
       </div>
     </MenuBackdrop>

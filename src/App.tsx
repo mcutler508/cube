@@ -20,6 +20,7 @@ import { ExitConfirmModal } from './components/HUD/ExitConfirmModal';
 import { LevelSelect } from './components/LevelSelect/LevelSelect';
 import { DailyLanding } from './components/DailyLanding/DailyLanding';
 import { AlgorithmsPanel } from './components/Algorithms/AlgorithmsPanel';
+import { FidgetLanding } from './fidget/FidgetLanding';
 import { useDevKeyboard } from './interaction/useDevKeyboard';
 import { initAudio } from './audio/audio';
 import { initHaptics } from './haptics/haptics';
@@ -101,6 +102,7 @@ function AppRoutes() {
         {menuView === 'daily' && <DailyLanding />}
         {menuView === 'learn' && <LevelSelect />}
         {menuView === 'algos' && <AlgorithmsPanel />}
+        {menuView === 'fidget' && <FidgetLanding />}
         <style>{screenTransitionCss}</style>
       </div>
     );

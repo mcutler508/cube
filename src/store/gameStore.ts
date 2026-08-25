@@ -90,7 +90,7 @@ interface GameStore {
 
   // --- menu routing ---
   /** Which landing screen to show when no level is active. */
-  menuView: 'daily' | 'learn' | 'algos';
+  menuView: 'daily' | 'learn' | 'algos' | 'fidget';
 
   /**
    * True while the player is inside the forced first-run tutorial (learn-01
@@ -131,7 +131,7 @@ interface GameStore {
   exitToMenu: () => void;
   requestHint: () => void;
   dismissHint: () => void;
-  setMenuView: (view: 'daily' | 'learn' | 'algos') => void;
+  setMenuView: (view: 'daily' | 'learn' | 'algos' | 'fidget') => void;
   setTutorialRun: (v: boolean) => void;
   setPreviewAlgorithm: (id: string | null) => void;
   setSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
