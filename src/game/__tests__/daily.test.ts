@@ -1,15 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import {
   DAILY_SCRAMBLE_LENGTHS,
+  daily2x2LevelFor,
+  daily2x2Scramble,
   dailyLevelFor,
   dailyScramble,
+  isDaily2x2LevelId,
   isDailyLevelId,
   isoDate,
   mulberry32,
+  parseDaily2x2LevelId,
   parseDailyLevelId,
 } from '../daily';
 import { applyMoves, createSolvedCube } from '../../cube/cubeState';
-import { isSolved } from '../../cube/solved';
+import { invertMove } from '../../cube/notation';
+import { isSolved, isSolved2x2 } from '../../cube/solved';
 
 describe('daily challenge', () => {
   it('mulberry32 produces the same sequence for the same seed', () => {
@@ -98,5 +103,46 @@ describe('daily challenge', () => {
     expect(parseDailyLevelId('learn-01-first-turn')).toBeNull();
     // Old-format daily ids without difficulty suffix don't parse.
     expect(parseDailyLevelId('daily-2026-08-17')).toBeNull();
+  });
+
+  it('daily 2x2 scramble is deterministic and non-trivial', () => {
+    const a = daily2x2Scramble('2026-08-17');
+    const b = daily2x2Scramble('2026-08-17');
+    expect(a).toEqual(b);
+    expect(a.length).toBeGreaterThan(0);
+    const cube = applyMoves(createSolvedCube(), a);
+    // Solved-check on 8 corners must fail — otherwise the scramble is a no-op.
+    expect(isSolved2x2(cube)).toBe(false);
+  });
+
+  it('daily 2x2 scramble differs from same-date 3x3 scramble', () => {
+    const iso = '2026-08-17';
+    expect(daily2x2Scramble(iso)).not.toEqual(
+      dailyScramble(iso, 'casual').slice(0, daily2x2Scramble(iso).length),
+    );
+  });
+
+  it('daily2x2LevelFor produces a 2x2 level that unwinds to solved', () => {
+    const level = daily2x2LevelFor('2026-08-17');
+    expect(level.id).toBe('daily-2x2-2026-08-17');
+    expect(level.cubeSize).toBe('2x2');
+    expect(level.objective).toEqual({ type: 'full_solve' });
+    // Applying the inverse of the setup moves must land back at a
+    // corners-solved cube — otherwise the daily is unsolvable in principle.
+    const scrambled = applyMoves(createSolvedCube(), level.setupMoves);
+    const solved = applyMoves(
+      scrambled,
+      [...level.setupMoves].reverse().map(invertMove),
+    );
+    expect(isSolved2x2(solved)).toBe(true);
+  });
+
+  it('2x2 daily id helpers identify and parse only 2x2 ids', () => {
+    expect(isDaily2x2LevelId('daily-2x2-2026-08-17')).toBe(true);
+    expect(isDaily2x2LevelId('daily-2026-08-17-casual')).toBe(false);
+    expect(parseDaily2x2LevelId('daily-2x2-2026-08-17')).toEqual({
+      iso: '2026-08-17',
+    });
+    expect(parseDaily2x2LevelId('daily-2026-08-17-casual')).toBeNull();
   });
 });

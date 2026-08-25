@@ -270,6 +270,44 @@ export const THEMES: readonly CubeTheme[] = [
     reticle: { color: '#ffffff', intensityScale: 1.2 },
   },
   {
+    // Graffiti Collage — the 2x2 signature theme. Face textures are 1024²
+    // multi-layer collages (halftone dots, stripe bands, chunky tag stamps,
+    // scattered icon shapes, spray speckles) painted over the primary face
+    // color. Every ~42% sticker crop still shows the face color as the
+    // dominant read (>50% of pixel area) so lineup-by-color remains
+    // trivially readable — see comments in themeTextures.ts for the layer
+    // budget rationale. Matte surface treatment matches 'graffiti' so it
+    // reads as sticker-on-cube, not lacquered plastic.
+    id: 'graffiti-collage',
+    name: 'Graffiti Collage',
+    colors: {
+      up: '#f4f2ea',
+      down: '#ffcf1a',
+      front: '#12a05a',
+      back: '#1f5fd6',
+      left: '#f57a1e',
+      right: '#e5303f',
+    },
+    material: {
+      roughness: 0.78,
+      metalness: 0,
+      envMapIntensity: 0.55,
+      clearcoat: 0,
+      clearcoatRoughness: 1,
+      iridescence: 0,
+      iridescenceIOR: 1.3,
+      iridescenceThicknessRange: [100, 400],
+      sheen: 0.2,
+      sheenColor: '#a09080',
+      ior: 1.4,
+      anisotropy: 0,
+      anisotropyRotation: 0,
+      specularIntensity: 0.6,
+      specularColor: '#ffffff',
+    },
+    reticle: { color: '#ffffff', intensityScale: 1.2 },
+  },
+  {
     // Holographic — peacock-foil sticker material. Three layers doing the
     // work together (see themeTextures.ts):
     //   1. normalMap = fine radial grooves so the surface has visible "hair

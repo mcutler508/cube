@@ -6,7 +6,12 @@
  */
 
 export function normalizeHandle(name: string): string {
-  return name.trim().slice(0, 20);
+  // Lowercase at the client so we write a single canonical form to Supabase.
+  // This makes the unique constraint on `players.name` sufficient to prevent
+  // case-collision duplicates (e.g. "MikeC" vs "mikec") and lets sign-in use
+  // a plain `.eq('name', handle)` filter without needing ilike or a separate
+  // `name_lower` column. Tradeoff: the displayed handle is always lowercase.
+  return name.trim().toLowerCase().slice(0, 20);
 }
 
 const BANNED_WORDS = [

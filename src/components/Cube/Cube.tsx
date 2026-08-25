@@ -32,6 +32,7 @@ const tmpVec = new THREE.Vector3();
 
 export function Cube() {
   const cubies = useGameStore((s) => s.cubeState.cubies);
+  const cubeSize = useGameStore((s) => s.currentLevel?.cubeSize ?? '3x3');
   // During a guided-phase drill, we know which face the player is expected
   // to turn next. We show that hint on a single "source" piece (the center
   // cubie of the target face) — but only after the player has been idle
@@ -131,10 +132,20 @@ export function Cube() {
     tick(delta, groupRefs, animationRef, lastDragCubieIdsRef);
   });
 
-  const visibleCubies = useMemo(
-    () => cubies.filter((c) => !(c.home[0] === 0 && c.home[1] === 0 && c.home[2] === 0)),
-    [cubies],
-  );
+  const visibleCubies = useMemo(() => {
+    // 3x3 hides just the core (position 0,0,0). 2x2 hides every non-corner:
+    // any cubie with a zero on any axis is either an edge, face-center, or
+    // the core. The engine still tracks them (face turns move them) — we
+    // simply don't draw them.
+    if (cubeSize === '2x2') {
+      return cubies.filter(
+        (c) => c.home[0] !== 0 && c.home[1] !== 0 && c.home[2] !== 0,
+      );
+    }
+    return cubies.filter(
+      (c) => !(c.home[0] === 0 && c.home[1] === 0 && c.home[2] === 0),
+    );
+  }, [cubies, cubeSize]);
 
   const attachRef = useCallback((id: number) => (g: THREE.Group | null) => {
     if (g) groupRefs.current.set(id, g);
@@ -154,12 +165,22 @@ export function Cube() {
     [attachRef],
   );
 
+  // Layout scale trick for 2x2. State positions stay ±1 (so animations,
+  // hit tests, and detection all keep working as-is), but we render the 8
+  // corner cubies half as far from center — otherwise deleting the middle
+  // row leaves a full-cubie-wide gap between corners and the cube looks
+  // like 8 floating dice. The compensating `renderScale={2}` inside each
+  // Cubie keeps cubie + sticker sizes constant in world units so a 2x2
+  // cubie is the same size as a 3x3 one, just packed tighter.
+  const layoutScale = cubeSize === '2x2' ? 0.5 : 1;
+  const cubieRenderScale = cubeSize === '2x2' ? 2 : 1;
   return (
-    <group>
+    <group scale={layoutScale}>
       {visibleCubies.map((c) => (
         <Cubie
           key={c.id}
           cubie={c}
+          renderScale={cubieRenderScale}
           hintFace={c.id === hintCubieId ? activeHintFace : null}
           centerLabel={centerLabelByCubieId?.get(c.id) ?? null}
           ref={getRef(c.id)}

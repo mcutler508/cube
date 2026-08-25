@@ -136,3 +136,50 @@ export function parseDailyLevelId(
   if (!m) return null;
   return { iso: m[1], difficulty: m[2] as DailyDifficulty };
 }
+
+// ---------------------------------------------------------------------------
+// 2x2 daily — the graffiti-collage mode. One length per day (no
+// Casual/Regular/Full split); 2x2 God's number is 11 so ~10 quarter turns
+// gives a real puzzle without an obvious solve path from inspection.
+// ---------------------------------------------------------------------------
+
+const DAILY_2X2_SCRAMBLE_LENGTH = 10;
+
+/**
+ * Deterministic 2x2 scramble for a given ISO date. Seeded distinctly from
+ * the 3x3 daily so a player who did today's 3x3 doesn't get a scramble that
+ * shares a prefix with today's 2x2 (would feel like cheating).
+ */
+export function daily2x2Scramble(dateOrSeed: string): Move[] {
+  const rng = mulberry32(djb2(`2x2-${dateOrSeed}`));
+  return generateScramble(DAILY_2X2_SCRAMBLE_LENGTH, rng);
+}
+
+export function daily2x2LevelFor(iso: string): Level {
+  return {
+    id: `daily-2x2-${iso}`,
+    name: 'Daily · 2×2',
+    tier: 'rookie',
+    setupMoves: daily2x2Scramble(iso),
+    objective: { type: 'full_solve' },
+    // Move thresholds tuned for 2x2: expert speedcubers routinely solve in
+    // under 10 moves; a competent beginner lands in the 20-30 range.
+    parMoves: 25,
+    expertMoves: 12,
+    cubeSize: '2x2',
+  };
+}
+
+export function todaysDaily2x2(now: Date = new Date()): Level {
+  return daily2x2LevelFor(isoDate(now));
+}
+
+export function isDaily2x2LevelId(id: string): boolean {
+  return /^daily-2x2-\d{4}-\d{2}-\d{2}$/.test(id);
+}
+
+/** Parse a 2x2 daily id into its date, or null when it doesn't match. */
+export function parseDaily2x2LevelId(id: string): { iso: string } | null {
+  const m = id.match(/^daily-2x2-(\d{4}-\d{2}-\d{2})$/);
+  return m ? { iso: m[1] } : null;
+}

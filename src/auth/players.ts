@@ -44,16 +44,24 @@ export type UpdateNameError =
   | 'unconfigured'
   | 'network';
 
-export interface SignUpResult {
-  ok: boolean;
-  player?: PlayerRow;
-  error?: SignUpError;
-}
+export type SignUpResult =
+  | { ok: true; player: PlayerRow }
+  | { ok: false; error: SignUpError };
 
-export interface SignInResult {
-  ok: boolean;
-  player?: PlayerRow;
-  error?: SignInError;
+export type SignInResult =
+  | { ok: true; player: PlayerRow }
+  | { ok: false; error: SignInError };
+
+/**
+ * Postgres errors in the `42xxx` class cover syntax, schema, and permission
+ * problems (42703 undefined column, 42P01 undefined table, 42501 RLS /
+ * insufficient privilege). These aren't network failures — surfacing them as
+ * "network" hides configuration drift. Callers should map them to the
+ * `unconfigured` error so the UI hints at "sign-in isn't configured on this
+ * build" and the underlying code shows up in the console for the developer.
+ */
+function isPostgresConfigError(code: string | undefined): boolean {
+  return typeof code === 'string' && /^42/.test(code);
 }
 
 export async function signUp(
@@ -81,18 +89,24 @@ export async function signUp(
     if (error) {
       const code = (error as { code?: string }).code;
       if (code === '23505') {
-        // Unique-violation could be on name_lower or email_lower — sniff the
-        // error text to tell them apart so the UI can surface the right hint.
+        // Unique-violation on `name` or `email` — sniff the error text to
+        // tell them apart so the UI can surface the right hint. (`name` is
+        // pre-lowercased by normalizeHandle, so this constraint fires on
+        // exact-match handle collisions.)
         const msg = `${error.message ?? ''} ${(error as { details?: string }).details ?? ''}`;
         if (/email/i.test(msg)) return { ok: false, error: 'email-taken' };
         return { ok: false, error: 'name-taken' };
       }
-      console.warn('[players] signUp error', error.message);
+      if (isPostgresConfigError(code)) {
+        console.error('[players] signUp schema/permission error', code, error.message, error);
+        return { ok: false, error: 'unconfigured' };
+      }
+      console.error('[players] signUp error', code, error.message, error);
       return { ok: false, error: 'network' };
     }
     return { ok: true, player: data as PlayerRow };
   } catch (err) {
-    console.warn('[players] signUp threw', err);
+    console.error('[players] signUp threw', err);
     return { ok: false, error: 'network' };
   }
 }
@@ -107,12 +121,16 @@ export async function markTutorialCompleted(playerId: string): Promise<void> {
   const client = getSupabase();
   if (!client) return;
   try {
-    await client
+    const { error } = await client
       .from('players')
       .update({ tutorial_completed: true })
       .eq('id', playerId);
+    if (error) {
+      const code = (error as { code?: string }).code;
+      console.error('[players] markTutorialCompleted error', code, error.message, error);
+    }
   } catch (err) {
-    console.warn('[players] markTutorialCompleted threw', err);
+    console.error('[players] markTutorialCompleted threw', err);
   }
 }
 
@@ -125,22 +143,43 @@ export async function signIn(name: string, passcode: string): Promise<SignInResu
   const passcode_hash = await hashPasscode(passcode);
 
   try {
+    // Handle is already lowercased by normalizeHandle, so an exact-match
+    // lookup on `name` is safe. `.limit(1)` + read-first-row (rather than
+    // `.maybeSingle()`) is defensive: if a legacy duplicate row exists in
+    // the DB we'd rather sign the account in than brick it with a PostgREST
+    // "multiple rows returned" 406.
     const { data, error } = await client
       .from('players')
       .select('id, name, email, created_at, updated_at, tutorial_completed, passcode_hash')
-      .eq('name_lower', handle.toLowerCase())
-      .maybeSingle();
+      .eq('name', handle)
+      .limit(1);
     if (error) {
-      console.warn('[players] signIn error', error.message);
+      const code = (error as { code?: string }).code;
+      if (isPostgresConfigError(code)) {
+        console.error('[players] signIn schema/permission error', code, error.message, error);
+        return { ok: false, error: 'unconfigured' };
+      }
+      console.error('[players] signIn error', code, error.message, error);
       return { ok: false, error: 'network' };
     }
-    if (!data) return { ok: false, error: 'not-found' };
-    const stored = (data as { passcode_hash?: string | null }).passcode_hash;
+    const row = Array.isArray(data) && data.length > 0 ? data[0] : null;
+    if (!row) return { ok: false, error: 'not-found' };
+    const stored = (row as { passcode_hash?: string | null }).passcode_hash;
     if (!stored || stored !== passcode_hash) return { ok: false, error: 'wrong-passcode' };
-    const { passcode_hash: _omit, ...rest } = data as PlayerRow & { passcode_hash: string };
-    return { ok: true, player: rest };
+    // Strip the passcode hash before returning the row upward — nothing in
+    // the store or UI has any business seeing it.
+    const full = row as PlayerRow & { passcode_hash: string };
+    const player: PlayerRow = {
+      id: full.id,
+      name: full.name,
+      email: full.email,
+      created_at: full.created_at,
+      updated_at: full.updated_at,
+      tutorial_completed: full.tutorial_completed,
+    };
+    return { ok: true, player };
   } catch (err) {
-    console.warn('[players] signIn threw', err);
+    console.error('[players] signIn threw', err);
     return { ok: false, error: 'network' };
   }
 }

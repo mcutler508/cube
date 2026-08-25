@@ -3,7 +3,7 @@ import type { CubeState, Move } from '../types/cube';
 import type { Difficulty, GameEvent } from '../types/game';
 import type { FaceLetter } from '../cube/net';
 import { applyMove, createSolvedCube } from '../cube/cubeState';
-import { isSolved as detectSolved } from '../cube/solved';
+import { isSolved as detectSolved, isSolved2x2 as detectSolved2x2 } from '../cube/solved';
 import { invertMove } from '../cube/notation';
 import { evaluateProgress } from '../game/progress';
 import { updateStreak } from '../game/streak';
@@ -203,7 +203,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (s.phase === 'solved' || s.objectiveCompleted) return;
     const next = applyMove(s.cubeState, move);
     const newProgress = evaluateProgress(next);
-    const solved = detectSolved(next);
+    // 2x2 levels ignore edges/centers when deciding "solved" — only the 8
+    // visible corners matter. See isSolved2x2 for the reasoning.
+    const cubeSize = s.currentLevel?.cubeSize ?? '3x3';
+    const solved =
+      cubeSize === '2x2' ? detectSolved2x2(next) : detectSolved(next);
     const now = performance.now();
     const startedAt = s.startedAt ?? now;
 
@@ -237,7 +241,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     let objectiveHit =
       s.currentLevel != null &&
       !s.objectiveCompleted &&
-      evaluateObjective(next, s.currentLevel.objective);
+      evaluateObjective(next, s.currentLevel.objective, cubeSize);
     if (drillCompleted && !s.objectiveCompleted) objectiveHit = true;
     const objectiveIsSolve = s.currentLevel?.objective.type === 'full_solve';
     const objectiveFinished = objectiveHit || solved;
@@ -375,7 +379,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   commitUndoMove: (move) => {
     const s = get();
     const next = applyMove(s.cubeState, move);
-    const solved = detectSolved(next);
+    const cubeSize = s.currentLevel?.cubeSize ?? '3x3';
+    const solved =
+      cubeSize === '2x2' ? detectSolved2x2(next) : detectSolved(next);
     const p = evaluateProgress(next);
     const d = detectAll(next);
     set({

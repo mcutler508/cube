@@ -5,9 +5,12 @@ import {
   DAILY_DIFFICULTY_LABELS,
   DAILY_DIFFICULTY_TAGLINES,
   DAILY_SCRAMBLE_LENGTHS,
+  daily2x2LevelFor,
   dailyLevelFor,
+  isDaily2x2LevelId,
   isDailyLevelId,
   isoDate,
+  parseDaily2x2LevelId,
   parseDailyLevelId,
   type DailyDifficulty,
 } from '../../game/daily';
@@ -24,33 +27,58 @@ import { PlayerChip } from '../Player/PlayerChip';
  * to play. Also shows all-time best for the selected difficulty plus a total
  * days-played counter across all difficulties.
  */
+type DailyMode = '3x3' | '2x2';
+
 export function DailyLanding() {
   const setMenuView = useGameStore((s) => s.setMenuView);
+  const [mode, setMode] = useState<DailyMode>('3x3');
   const [difficulty, setDifficulty] = useState<DailyDifficulty>('regular');
   const bests = useMemo(() => getAllBests(), []);
   const today = useMemo(() => isoDate(), []);
-  const level = useMemo(() => dailyLevelFor(today, difficulty), [today, difficulty]);
+  const level = useMemo(
+    () =>
+      mode === '2x2'
+        ? daily2x2LevelFor(today)
+        : dailyLevelFor(today, difficulty),
+    [mode, today, difficulty],
+  );
   const todaysBest = bests[level.id];
+  // Scramble length shown in the play CTA. 2x2 daily is a fixed length; 3x3
+  // reads from the difficulty table.
+  const scrambleLen = mode === '2x2' ? level.setupMoves.length : DAILY_SCRAMBLE_LENGTHS[difficulty];
 
   const allTimeBest = useMemo(() => {
     let bestMs = Infinity;
     let bestDate: string | null = null;
     for (const key of Object.keys(bests)) {
-      const parsed = parseDailyLevelId(key);
-      if (!parsed || parsed.difficulty !== difficulty) continue;
+      let iso: string | null = null;
+      if (mode === '2x2') {
+        const parsed = parseDaily2x2LevelId(key);
+        if (parsed) iso = parsed.iso;
+      } else {
+        const parsed = parseDailyLevelId(key);
+        if (parsed && parsed.difficulty === difficulty) iso = parsed.iso;
+      }
+      if (!iso) continue;
       const b = bests[key];
       if (b.bestTimeMs < bestMs) {
         bestMs = b.bestTimeMs;
-        bestDate = parsed.iso;
+        bestDate = iso;
       }
     }
     return bestDate ? { ms: bestMs, date: bestDate } : null;
-  }, [bests, difficulty]);
+  }, [bests, difficulty, mode]);
 
-  // Days played counts unique dates where any difficulty was completed.
+  // Days played counts unique dates where ANY daily (3x3 any difficulty or
+  // 2x2) was completed.
   const dayCount = useMemo(() => {
     const dates = new Set<string>();
     for (const key of Object.keys(bests)) {
+      if (isDaily2x2LevelId(key)) {
+        const p = parseDaily2x2LevelId(key);
+        if (p) dates.add(p.iso);
+        continue;
+      }
       if (!isDailyLevelId(key)) continue;
       const parsed = parseDailyLevelId(key);
       if (parsed) dates.add(parsed.iso);
@@ -78,15 +106,15 @@ export function DailyLanding() {
           Same puzzle for everyone. Pick your depth.
         </p>
 
-        {/* Difficulty picker */}
+        {/* Mode picker: 3x3 (classic daily) or 2x2 (single-length graffiti). */}
         <div className="mt-6 flex gap-1 rounded-full bg-white/[0.05] p-1 ring-1 ring-white/10">
-          {DAILY_DIFFICULTIES.map((d) => {
-            const active = d === difficulty;
+          {(['3x3', '2x2'] as const).map((m) => {
+            const active = m === mode;
             return (
               <button
-                key={d}
+                key={m}
                 type="button"
-                onClick={() => setDifficulty(d)}
+                onClick={() => setMode(m)}
                 className={[
                   'flex-1 rounded-full px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] transition-all',
                   active
@@ -94,14 +122,44 @@ export function DailyLanding() {
                     : 'text-white/60 hover:text-white/85',
                 ].join(' ')}
               >
-                {DAILY_DIFFICULTY_LABELS[d]}
+                {m === '3x3' ? '3×3' : '2×2'}
               </button>
             );
           })}
         </div>
-        <div className="mt-1 text-center text-[10px] uppercase tracking-[0.22em] text-white/40">
-          {DAILY_DIFFICULTY_TAGLINES[difficulty]}
-        </div>
+
+        {mode === '3x3' ? (
+          <>
+            {/* Difficulty picker (3x3 only — 2x2 is a single fixed length) */}
+            <div className="mt-3 flex gap-1 rounded-full bg-white/[0.05] p-1 ring-1 ring-white/10">
+              {DAILY_DIFFICULTIES.map((d) => {
+                const active = d === difficulty;
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setDifficulty(d)}
+                    className={[
+                      'flex-1 rounded-full px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] transition-all',
+                      active
+                        ? 'bg-white text-black shadow'
+                        : 'text-white/60 hover:text-white/85',
+                    ].join(' ')}
+                  >
+                    {DAILY_DIFFICULTY_LABELS[d]}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-1 text-center text-[10px] uppercase tracking-[0.22em] text-white/40">
+              {DAILY_DIFFICULTY_TAGLINES[difficulty]}
+            </div>
+          </>
+        ) : (
+          <div className="mt-3 text-center text-[10px] uppercase tracking-[0.22em] text-white/40">
+            Graffiti collage · 8 corners · line up the primary color
+          </div>
+        )}
 
         {/* Play CTA */}
         <button
@@ -111,7 +169,7 @@ export function DailyLanding() {
         >
           <div className="flex flex-col">
             <span className="text-[10px] font-semibold uppercase tracking-[0.28em] text-black/55">
-              {today} · {DAILY_SCRAMBLE_LENGTHS[difficulty]} moves
+              {today} · {scrambleLen} moves
             </span>
             <span className="mt-1 text-xl font-semibold">
               {todaysBest ? 'Play again' : 'Solve today'}
@@ -132,7 +190,7 @@ export function DailyLanding() {
 
         <div className="mt-4 grid grid-cols-2 gap-2">
           <StatCard
-            label={`Best ${DAILY_DIFFICULTY_LABELS[difficulty]}`}
+            label={mode === '2x2' ? 'Best 2×2' : `Best ${DAILY_DIFFICULTY_LABELS[difficulty]}`}
             value={allTimeBest ? formatElapsed(allTimeBest.ms) : '—'}
             hint={allTimeBest?.date}
           />

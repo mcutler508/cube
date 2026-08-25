@@ -59,9 +59,9 @@ export function PlayerSignInModal({ initialMode = 'signin', onClose }: Props) {
           return;
         }
         setPlayer({
-          id: result.player!.id,
-          name: result.player!.name,
-          tutorialCompleted: result.player!.tutorial_completed,
+          id: result.player.id,
+          name: result.player.name,
+          tutorialCompleted: result.player.tutorial_completed,
         });
         onClose?.();
       } else {
@@ -71,9 +71,9 @@ export function PlayerSignInModal({ initialMode = 'signin', onClose }: Props) {
           return;
         }
         setPlayer({
-          id: result.player!.id,
-          name: result.player!.name,
-          tutorialCompleted: result.player!.tutorial_completed,
+          id: result.player.id,
+          name: result.player.name,
+          tutorialCompleted: result.player.tutorial_completed,
         });
         onClose?.();
       }
@@ -229,7 +229,7 @@ export function PlayerSignInModal({ initialMode = 'signin', onClose }: Props) {
   );
 }
 
-function signUpErrorMessage(err: SignUpError | undefined): string {
+function signUpErrorMessage(err: SignUpError): string {
   switch (err) {
     case 'name-taken':
       return 'That handle is already taken. Try another.';
@@ -251,7 +251,7 @@ function signUpErrorMessage(err: SignUpError | undefined): string {
   }
 }
 
-function signInErrorMessage(err: SignInError | undefined): string {
+function signInErrorMessage(err: SignInError): string {
   switch (err) {
     case 'not-found':
       return "We couldn't find that handle. Check the spelling or create an account.";

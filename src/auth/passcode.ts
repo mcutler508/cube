@@ -10,13 +10,12 @@ export function isValidPasscode(passcode: string): boolean {
 }
 
 export async function hashPasscode(passcode: string): Promise<string> {
+  // No non-crypto fallback: a djb2 hash would produce a value shaped nothing
+  // like a SHA-256 hex digest, so any deploy over plain HTTP (where
+  // `crypto.subtle` is unavailable) would silently break every sign-in for
+  // accounts that were created in a secure context. Fail loudly instead.
   if (typeof crypto === 'undefined' || !crypto.subtle) {
-    let h = 0;
-    for (let i = 0; i < passcode.length; i++) {
-      h = (h << 5) - h + passcode.charCodeAt(i);
-      h |= 0;
-    }
-    return `fallback-${h.toString(16)}`;
+    throw new Error('passcode hashing requires a secure context (HTTPS or localhost)');
   }
   const encoded = new TextEncoder().encode(`cube-passcode:${passcode}`);
   const buf = await crypto.subtle.digest('SHA-256', encoded);

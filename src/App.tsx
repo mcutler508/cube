@@ -60,7 +60,11 @@ function AppRoutes() {
   const currentLevelId = useGameStore((s) => s.currentLevel?.id ?? null);
   const isDrillLevel = useGameStore((s) => !!s.currentLevel?.drill);
   const menuView = useGameStore((s) => s.menuView);
-  const showCubeNet = useGameStore((s) => s.settings.showCubeNet);
+  // 2x2 mode suppresses 3x3-only HUD chrome: CubeNet (would render edges
+  // and centers that the player can't see) and MilestoneChips (rows /
+  // crosses / layers are 3x3 concepts).
+  const is2x2 = useGameStore((s) => s.currentLevel?.cubeSize === '2x2');
+  const showCubeNet = useGameStore((s) => s.settings.showCubeNet) && !is2x2;
   const background = useGameStore((s) => resolveBackground(s.settings.backgroundId));
 
   // Require sign-in before any play (when Supabase is configured). Dev builds
@@ -82,7 +86,9 @@ function AppRoutes() {
   }, [signInSatisfied, player]);
 
   if (isSupabaseConfigured() && hydrated && !player) {
-    return <PlayerSignInModal initialMode="signup" />;
+    // Default returning users on a cleared browser to the sign-in form;
+    // brand-new users still have the "Create an account" link in the modal.
+    return <PlayerSignInModal initialMode="signin" />;
   }
 
   if (!currentLevelId) {
@@ -154,7 +160,7 @@ function AppRoutes() {
         <NearSolvedGlow />
         <MilestoneBurst />
         <ObjectiveBanner />
-        {!isDrillLevel && <MilestoneChips />}
+        {!isDrillLevel && !is2x2 && <MilestoneChips />}
         <DrillOverlay />
         <MoveReadout />
         <FloatingFeedback />

@@ -29,6 +29,14 @@ import type { FaceLetter } from '../../types/cube';
 
 interface StickerProps {
   side: StickerSide;
+  /**
+   * Stable identifier for this physical sticker (`cubie.id * 8 + sideIndex`).
+   * Fed to per-sticker deterministic randomness — notably the graffiti /
+   * collage themes that crop a face-wide artwork per sticker. Without a
+   * stable key the crop would reshuffle on every remount (scramble, undo,
+   * theme toggle), which reads as flicker.
+   */
+  stickerKey?: number;
   /** True when this sticker currently lives on the hint target face. */
   highlighted?: boolean;
   /**
@@ -62,6 +70,21 @@ const HINT_EMISSIVE = new THREE.Color('#ffbf3b');
 /** Reused white constant for map-driven themes (see `materialColor` below). */
 const WHITE = new THREE.Color(0xffffff);
 
+/**
+ * Two-channel deterministic "random" in [0, 1). We only need two
+ * uncorrelated draws per sticker (the U + V offset), and we need them to be
+ * pure functions of the sticker's stable id. Two prime-scrambled `sin`
+ * hashes are cheap and produce visually well-scattered offsets across the
+ * sticker population.
+ */
+function seededUnit(seed: number): (channel: 0 | 1) => number {
+  return (channel) => {
+    const k = channel === 0 ? 12.9898 : 78.233;
+    const v = Math.sin((seed + 1) * k) * 43758.5453;
+    return v - Math.floor(v);
+  };
+}
+
 /** Scan-sweep geometry (in world units, derived from the mockup values). */
 const SWEEP_SEG_LEN = SIZE * 0.08;
 const SWEEP_SEG_THICK = SIZE * 0.028;
@@ -91,7 +114,12 @@ function sweepOpacity(t: number): number {
   return 1;
 }
 
-export function Sticker({ side, highlighted = false, centerLabel = null }: StickerProps) {
+export function Sticker({
+  side,
+  stickerKey = 0,
+  highlighted = false,
+  centerLabel = null,
+}: StickerProps) {
   const { position, rotation } = PLACEMENT[side];
   const theme = useActiveTheme();
   const hex = theme.colors[side];
@@ -141,19 +169,23 @@ export function Sticker({ side, highlighted = false, centerLabel = null }: Stick
     () => getStickerMap(theme.id, side),
     [theme.id, side],
   );
-  // For map-driven themes, clone with a random UV crop per sticker so the 9
-  // stickers on the same face each show a different chunk of the face-wide
-  // artwork. Constrained so offset + repeat stays within [0, 1] and no wrap
+  // For map-driven themes, clone with a per-sticker UV crop so the stickers
+  // on the same face each show a different chunk of the face-wide artwork.
+  // Seeded off `stickerKey` (a stable id derived from the cubie + side) so
+  // the crop is the same across remounts — otherwise every scramble / undo
+  // / theme toggle would reshuffle each sticker's crop, which reads as
+  // flicker. Constrained so offset + repeat stays within [0, 1] so no wrap
   // seam appears inside a sticker.
   const colorMap = useMemo(() => {
     if (!baseColorMap) return null;
     const clone = baseColorMap.clone();
     const repeat = 0.42;
     const maxOffset = 1 - repeat;
-    clone.offset.set(Math.random() * maxOffset, Math.random() * maxOffset);
+    const rand = seededUnit(stickerKey);
+    clone.offset.set(rand(0) * maxOffset, rand(1) * maxOffset);
     clone.repeat.set(repeat, repeat);
     return clone;
-  }, [baseColorMap]);
+  }, [baseColorMap, stickerKey]);
   const materialColor = colorMap ? WHITE : color;
   const materialRef = useRef<THREE.MeshPhysicalMaterial>(null);
   const reticleMatRef = useRef<THREE.MeshStandardMaterial>(null);

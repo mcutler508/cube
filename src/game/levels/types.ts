@@ -19,6 +19,15 @@ export type Objective =
 export type LevelTier = 'learn' | 'rookie';
 
 /**
+ * Cube form-factor. `'3x3'` is the standard 26-cubie puzzle; `'2x2'` renders
+ * only the 8 corners and treats the puzzle as solved when those 8 corners are
+ * back home (edges + centers, still physically present in the engine, are
+ * invisible and irrelevant to detection). Absent field means 3x3 for
+ * backwards compatibility with every existing level.
+ */
+export type CubeSize = '2x2' | '3x3';
+
+/**
  * A forced-sequence practice drill. The player repeats `algorithm` for
  * `guidedRuns` reps with input restricted to the correct next move
  * ("bumpers on"), then again for `unlockedRuns` reps back-to-back with all
@@ -54,4 +63,10 @@ export interface Level {
   expertMoves: number;
   /** When present, the level is an algorithm drill; see DrillConfig. */
   drill?: DrillConfig;
+  /**
+   * Cube form-factor for this level. Defaults to `'3x3'` when unset so every
+   * existing level keeps its behavior. `'2x2'` swaps the render (corners
+   * only), the solved check (corners only), and hides 3x3-only HUD chrome.
+   */
+  cubeSize?: CubeSize;
 }

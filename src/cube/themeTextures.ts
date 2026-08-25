@@ -211,6 +211,292 @@ function buildGraffitiFace(side: StickerSide): THREE.CanvasTexture {
 }
 
 // ---------------------------------------------------------------------------
+// Graffiti Collage — the 2x2's signature look. Each face is a 1024² collage
+// of BIG type stamps, halftone dots, stripes, tiny icon-like shapes, and
+// spray speckles. Louder than base graffiti (more layers, bigger stamps,
+// contrasting pattern strips) but with a critical constraint: the primary
+// face color must dominate every 42%-sized sticker crop so lineup-by-color
+// still works. We enforce that by (a) painting the base color first, (b)
+// keeping every overlay semi-transparent, (c) restricting overlays to bands
+// that occupy at most ~40% of the canvas area.
+// ---------------------------------------------------------------------------
+
+const COLLAGE_BG: Record<StickerSide, string> = {
+  up: '#f4f2ea',
+  down: '#ffcf1a',
+  front: '#12a05a',
+  back: '#1f5fd6',
+  left: '#f57a1e',
+  right: '#e5303f',
+};
+
+/** Contrast accent per face — used for text fills and shape outlines. */
+const COLLAGE_ACCENT: Record<StickerSide, string> = {
+  up: '#ff2f7a',
+  down: '#3a1a90',
+  front: '#00e5b5',
+  back: '#ffb200',
+  left: '#0088ff',
+  right: '#00c86e',
+};
+
+/** A second accent so each face carries two overlay hues, not just one. */
+const COLLAGE_ACCENT_2: Record<StickerSide, string> = {
+  up: '#111827',
+  down: '#e5303f',
+  front: '#f4f2ea',
+  back: '#ff2f7a',
+  left: '#ffcf1a',
+  right: '#111827',
+};
+
+const COLLAGE_TAGS: Record<StickerSide, readonly string[]> = {
+  up: ['SKY', 'HI', 'CLOUD9'],
+  down: ['GOLD', '24K', 'SHINE'],
+  front: ['GO', 'GREEN', 'FRESH'],
+  back: ['DEEP', 'BLU', 'DIVE'],
+  left: ['ZEST', 'HOT', 'ORNJ'],
+  right: ['RED', 'HOT', 'FIRE'],
+};
+
+function drawCollageIcon(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  color: string,
+  which: number,
+): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = Math.max(3, size * 0.07);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  const s = size;
+  switch (which % 6) {
+    case 0: {
+      // Star burst
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * Math.PI * 2;
+        const r = i % 2 === 0 ? s * 0.5 : s * 0.22;
+        const px = Math.cos(a) * r;
+        const py = Math.sin(a) * r;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case 1: {
+      // Lightning bolt
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.1, -s * 0.5);
+      ctx.lineTo(-s * 0.35, s * 0.05);
+      ctx.lineTo(-s * 0.05, s * 0.05);
+      ctx.lineTo(-s * 0.2, s * 0.5);
+      ctx.lineTo(s * 0.35, -s * 0.05);
+      ctx.lineTo(s * 0.05, -s * 0.05);
+      ctx.lineTo(s * 0.2, -s * 0.5);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case 2: {
+      // Smiley
+      ctx.beginPath();
+      ctx.arc(0, 0, s * 0.45, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(-s * 0.15, -s * 0.1, s * 0.06, 0, Math.PI * 2);
+      ctx.arc(s * 0.15, -s * 0.1, s * 0.06, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(0, s * 0.05, s * 0.22, 0, Math.PI);
+      ctx.stroke();
+      break;
+    }
+    case 3: {
+      // Heart
+      ctx.beginPath();
+      ctx.moveTo(0, s * 0.4);
+      ctx.bezierCurveTo(s * 0.6, -s * 0.05, s * 0.25, -s * 0.5, 0, -s * 0.1);
+      ctx.bezierCurveTo(-s * 0.25, -s * 0.5, -s * 0.6, -s * 0.05, 0, s * 0.4);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case 4: {
+      // Concentric rings
+      ctx.beginPath();
+      ctx.arc(0, 0, s * 0.45, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, s * 0.3, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, s * 0.15, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case 5: {
+      // Arrow
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.4, 0);
+      ctx.lineTo(s * 0.4, 0);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(s * 0.4, 0);
+      ctx.lineTo(s * 0.15, -s * 0.25);
+      ctx.lineTo(s * 0.15, s * 0.25);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+  }
+  ctx.restore();
+}
+
+function buildCollageFace(side: StickerSide): THREE.CanvasTexture {
+  const size = 1024;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('themeTextures: 2d canvas context unavailable');
+
+  const bg = COLLAGE_BG[side];
+  const accent = COLLAGE_ACCENT[side];
+  const accent2 = COLLAGE_ACCENT_2[side];
+  const accentRgb = hexToRgb(accent);
+  const accent2Rgb = hexToRgb(accent2);
+  const tags = COLLAGE_TAGS[side];
+  const rand = seededRandom(SIDE_SEED[side] * 7 + 13);
+
+  // 1. Base face color — the dominant read.
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, size, size);
+
+  // 2. Two narrow diagonal stripe bands, low-opacity accent2. Adds pattern
+  // without dominating the color. Each band is ~size*0.12 wide.
+  for (let band = 0; band < 2; band++) {
+    const angle = -0.4 + rand() * 0.8;
+    const cx = size * 0.5;
+    const cy = size * (0.25 + band * 0.5 + (rand() - 0.5) * 0.15);
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(angle);
+    ctx.fillStyle = `rgba(${accent2Rgb.r},${accent2Rgb.g},${accent2Rgb.b},0.18)`;
+    ctx.fillRect(-size, -size * 0.06, size * 2, size * 0.12);
+    // Diagonal hatching over the band for texture.
+    ctx.strokeStyle = `rgba(${accent2Rgb.r},${accent2Rgb.g},${accent2Rgb.b},0.35)`;
+    ctx.lineWidth = 3;
+    for (let sx = -size; sx < size; sx += 22) {
+      ctx.beginPath();
+      ctx.moveTo(sx, -size * 0.06);
+      ctx.lineTo(sx + 40, size * 0.06);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // 3. Halftone dot cluster in one corner — a classic collage motif.
+  {
+    const gx = rand() < 0.5 ? size * 0.15 : size * 0.75;
+    const gy = rand() < 0.5 ? size * 0.15 : size * 0.75;
+    for (let i = 0; i < 90; i++) {
+      const dx = (i % 12) * 22;
+      const dy = Math.floor(i / 12) * 22;
+      const r = 3 + rand() * 6;
+      ctx.fillStyle = `rgba(${accentRgb.r},${accentRgb.g},${accentRgb.b},0.55)`;
+      ctx.beginPath();
+      ctx.arc(gx + dx, gy + dy, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // 4. Big chunky tag stamps — the loudest layer. Each stamp gets black
+  // outline + accent fill + a couple of drip streaks.
+  const stamps = 4;
+  for (let i = 0; i < stamps; i++) {
+    const tag = tags[i % tags.length];
+    const cx = 150 + rand() * (size - 300);
+    const cy = 200 + rand() * (size - 400);
+    const angle = -0.3 + rand() * 0.6;
+    const font = 160 + Math.floor(rand() * 90);
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(angle);
+    ctx.font = `900 ${font}px "Impact", "Arial Black", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 16;
+    ctx.strokeStyle = 'rgba(10,10,10,0.92)';
+    ctx.strokeText(tag, 0, 0);
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.strokeText(tag, -2, -2);
+    ctx.fillStyle = accent;
+    ctx.fillText(tag, 0, 0);
+    for (let d = 0; d < 2; d++) {
+      const dx = -font * 0.35 + rand() * font * 0.7;
+      const dyStart = font * 0.25 + rand() * 10;
+      const len = 40 + rand() * 90;
+      const g = ctx.createLinearGradient(0, dyStart, 0, dyStart + len);
+      g.addColorStop(0, accent);
+      g.addColorStop(1, `rgba(${accentRgb.r},${accentRgb.g},${accentRgb.b},0)`);
+      ctx.fillStyle = g;
+      ctx.fillRect(dx, dyStart, 6 + rand() * 4, len);
+    }
+    ctx.restore();
+  }
+
+  // 5. A handful of icon-like shapes scattered around — pretend "stickers
+  // on stickers". Alternating between the two accent colors so the collage
+  // feels curated, not monochromatic-with-tags.
+  const icons = 6;
+  for (let i = 0; i < icons; i++) {
+    const x = 100 + rand() * (size - 200);
+    const y = 100 + rand() * (size - 200);
+    const s = 60 + rand() * 60;
+    const color = i % 2 === 0 ? accent : accent2;
+    // Halve alpha for icons that landed on/near a stamp so they don't
+    // become unreadable clutter. Cheap heuristic: just apply globalAlpha.
+    ctx.save();
+    ctx.globalAlpha = 0.78;
+    drawCollageIcon(ctx, x, y, s, color, Math.floor(rand() * 6));
+    ctx.restore();
+  }
+
+  // 6. Spray speckle field — accent1, low alpha. Ties the layers together.
+  for (let i = 0; i < 1400; i++) {
+    const alpha = 0.12 + rand() * 0.28;
+    ctx.fillStyle = `rgba(${accentRgb.r},${accentRgb.g},${accentRgb.b},${alpha})`;
+    ctx.fillRect(rand() * size, rand() * size, 1 + rand() * 2, 1 + rand() * 2);
+  }
+
+  // 7. Faint scratches for surface grain.
+  ctx.strokeStyle = 'rgba(0,0,0,0.10)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 40; i++) {
+    ctx.beginPath();
+    ctx.moveTo(rand() * size, rand() * size);
+    ctx.lineTo(rand() * size, rand() * size);
+    ctx.stroke();
+  }
+
+  const t = new THREE.CanvasTexture(canvas);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 8;
+  t.needsUpdate = true;
+  return t;
+}
+
+// ---------------------------------------------------------------------------
 // Holographic — the "peacock foil" sticker look. Two maps working together:
 //   - normalMap: fine radial grooves radiating from the sticker's center,
 //     giving the surface visible directional texture (the "hair lines" you
@@ -364,11 +650,21 @@ export function getStickerMap(
   themeId: ThemeId,
   side: StickerSide,
 ): THREE.Texture | null {
-  if (themeId !== 'graffiti') return null;
-  const key = `graffiti-${side}`;
-  const cached = cache.get(key);
-  if (cached) return cached;
-  const t = buildGraffitiFace(side);
-  cache.set(key, t);
-  return t;
+  if (themeId === 'graffiti') {
+    const key = `graffiti-${side}`;
+    const cached = cache.get(key);
+    if (cached) return cached;
+    const t = buildGraffitiFace(side);
+    cache.set(key, t);
+    return t;
+  }
+  if (themeId === 'graffiti-collage') {
+    const key = `graffiti-collage-${side}`;
+    const cached = cache.get(key);
+    if (cached) return cached;
+    const t = buildCollageFace(side);
+    cache.set(key, t);
+    return t;
+  }
+  return null;
 }

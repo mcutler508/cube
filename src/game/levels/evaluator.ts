@@ -1,6 +1,6 @@
 import type { CubeState } from '../../types/cube';
 import { computeNet } from '../../cube/net';
-import { isSolved } from '../../cube/solved';
+import { isSolved, isSolved2x2 } from '../../cube/solved';
 import { evaluateProgress } from '../progress';
 import {
   isCrossOn,
@@ -8,12 +8,19 @@ import {
   isLayerOn,
   isRowOn,
 } from '../detections';
-import type { Objective } from './types';
+import type { CubeSize, Objective } from './types';
 
-export function evaluateObjective(state: CubeState, objective: Objective): boolean {
+export function evaluateObjective(
+  state: CubeState,
+  objective: Objective,
+  cubeSize: CubeSize = '3x3',
+): boolean {
   switch (objective.type) {
     case 'full_solve':
-      return isSolved(state);
+      // On a 2x2, only the 8 visible corners count as "the cube" — the
+      // engine's edges + centers still track state but are invisible and
+      // untouchable, so the standard 26-cubie isSolved() would never fire.
+      return cubeSize === '2x2' ? isSolved2x2(state) : isSolved(state);
 
     case 'complete_face':
       return isFaceOn(computeNet(state), objective.face);
