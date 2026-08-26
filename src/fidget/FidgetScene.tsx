@@ -1,5 +1,5 @@
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
-import { Environment, ContactShadows } from '@react-three/drei';
+import { Environment, ContactShadows, SpotLight } from '@react-three/drei';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { Brush, Evaluator, SUBTRACTION, INTERSECTION } from 'three-bvh-csg';
 import { Suspense, useCallback, useLayoutEffect, useMemo, useRef } from 'react';
@@ -87,13 +87,34 @@ export function FidgetScene() {
         camera.lookAt(0, 0, 0);
       }}
     >
-      <ambientLight intensity={0.25} />
-      <directionalLight position={[4, 6, 3]} intensity={0.6} color="#ffe6c4" />
-      <directionalLight position={[-5, 2, -3]} intensity={0.35} color="#8ea6ff" />
+      <ambientLight intensity={0.2} />
+      {/* Neutral warm/cool key + fill from the top half. */}
+      <directionalLight position={[4, 6, 3]} intensity={0.5} color="#ffe6c4" />
+      <directionalLight position={[-5, 2, -3]} intensity={0.3} color="#8ea6ff" />
+
+      {/* Rainbow "gel" lights ringed around the cube. Iridescence's spectral
+          shift needs COLORED incoming light to produce a visible rainbow —
+          the neutral HDRI alone gives a mostly-monochrome shimmer. These
+          five saturated point lights at different positions bounce off the
+          chrome at different angles, so the iridescent film shifts each
+          hotspot through a different band of the visible spectrum and you
+          see all the colors on the piece at once. */}
+      <pointLight position={[3.5, 1.5, 2]} intensity={12} color="#ff2a5a" distance={9} decay={2} />
+      <pointLight position={[-3, 0.5, 2.5]} intensity={12} color="#5a2aff" distance={9} decay={2} />
+      <pointLight position={[2, -1.5, -3]} intensity={12} color="#00e0a8" distance={9} decay={2} />
+      <pointLight position={[-2.5, 2.5, -2]} intensity={12} color="#ffbf00" distance={9} decay={2} />
+      <pointLight position={[0, -2.5, 3]} intensity={10} color="#00c0ff" distance={9} decay={2} />
 
       <ResponsiveCamera />
       <Suspense fallback={null}>
-        <Environment preset="studio" background={false} />
+        {/* Colorful HDRI is REQUIRED for iridescence to actually read as
+            rainbow — a neutral studio softbox gives grey chrome because
+            there are no colored lights to shift. Warehouse mixes cool
+            skylights + warm sodium lamps + orange bounce, so the thin-film
+            interference produces visible spectral shifts across the whole
+            surface. */}
+        <Environment preset="warehouse" background={false} />
+        <BeamLight />
         <FidgetAssembly />
         <ContactShadows
           position={[0, -0.75, 0]}
@@ -536,22 +557,43 @@ function FidgetAssembly() {
   );
 }
 
+// Slightly darker chrome base than pure white. On full metalness the base
+// color TINTS the specular reflection — a darker tint (rather than bright
+// white) means the iridescent rainbow shows against a chromier background
+// instead of washing to a bright neutral.
+const GALAXY_TINT = '#8890a0';
+
 /**
- * PVD iridescent chrome — shared by inner + outer so highlights transfer
- * across the seam without a visible material break.
+ * PVD iridescent chrome — the fidget's "Galaxy" finish. Shared by inner +
+ * outer so highlights transfer across the seam without a visible material
+ * break. Two tuning choices make the rainbow show dramatically:
+ *   1. Wide film thickness range (80-950nm) sweeps the whole visible
+ *      spectrum across surface normals — more dramatic than plain chrome's
+ *      ~120-780 window.
+ *   2. Slightly darker chrome tint (see GALAXY_TINT). At metalness=1 the
+ *      base color tints the specular; a darker base means the iridescent
+ *      colored highlights punch harder against the reflection instead of
+ *      being buried in a bright neutral.
+ * The colorful HDRI (warehouse — see FidgetScene) is what actually drives
+ * the visible rainbow. Studio HDRIs are neutral and give grey chrome.
  */
 function IridescentChromeMaterial() {
   return (
     <meshPhysicalMaterial
-      color="#c8c8d0"
+      color={GALAXY_TINT}
       metalness={1}
-      roughness={0.08}
+      // Slightly smoother than 0.08 → tighter, brighter highlights so the
+      // rainbow-shifted spots read as vivid punches instead of soft washes.
+      roughness={0.04}
       iridescence={1}
-      iridescenceIOR={1.35}
-      iridescenceThicknessRange={[120, 780]}
-      envMapIntensity={1.4}
+      // Higher IOR = stronger spectral shift per unit of normal change =
+      // more rainbow variation across the surface.
+      iridescenceIOR={1.6}
+      // Widened all the way to a full-spectrum sweep.
+      iridescenceThicknessRange={[50, 1000]}
+      envMapIntensity={1.6}
       clearcoat={1}
-      clearcoatRoughness={0.05}
+      clearcoatRoughness={0.04}
     />
   );
 }
@@ -603,6 +645,61 @@ function buildInnerCoreGeometry(): THREE.BufferGeometry {
   cubeBrush.geometry.dispose();
   result.geometry.computeVertexNormals();
   return result.geometry;
+}
+
+/**
+ * Visible volumetric spotlight beam that strikes the fidget cube from the
+ * upper-front-left. drei's SpotLight renders a cone geometry with a fake-
+ * volumetric shader (the "beam" you see in space), plus the actual
+ * three.js SpotLight illumination that the chrome material reflects.
+ *
+ * The chrome + iridescence combo makes the beam's hit-point on the cube
+ * produce colored highlights that shift across the spectrum as the piece
+ * rotates — reads as prism-like refraction even though the light is
+ * technically only reflecting off an opaque metal surface.
+ *
+ * three.js SpotLights point along their local -Z; to aim at the cube
+ * (origin) we set a target Object3D there and attach it as the light's
+ * target once mounted.
+ */
+function BeamLight() {
+  const spotRef = useRef<THREE.SpotLight>(null);
+  const targetRef = useRef<THREE.Object3D>(null);
+  useLayoutEffect(() => {
+    if (spotRef.current && targetRef.current) {
+      spotRef.current.target = targetRef.current;
+      spotRef.current.target.updateMatrixWorld();
+    }
+  }, []);
+  return (
+    <>
+      <object3D ref={targetRef} position={[0, 0, 0]} />
+      <SpotLight
+        ref={spotRef}
+        position={[-2.6, 3.4, 2.2]}
+        color="#f4f0ff"
+        distance={7}
+        // Very narrow cone → reads as a laser, not a floodlight. 0.06 rad
+        // is about 3.4° which is essentially a pencil beam at this scene
+        // scale.
+        angle={0.06}
+        // Near-zero penumbra so the cone edge is crisp instead of soft.
+        penumbra={0.08}
+        // Slow falloff along length → the beam maintains its brightness
+        // most of the way from origin to cube instead of fading to nothing.
+        attenuation={6.5}
+        // Sharper edge falloff at the cone rim → thinner-looking beam.
+        anglePower={8}
+        // Cranked so the reflected hotspot on the chrome punches even next
+        // to the bright warehouse HDRI reflections.
+        intensity={90}
+        volumetric
+        // Higher opacity than the earlier soft cone → visible beam reads
+        // as solid coherent light, laser-like.
+        opacity={0.65}
+      />
+    </>
+  );
 }
 
 function pulseHaptic(ms: number) {

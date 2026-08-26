@@ -1,21 +1,54 @@
 import { useGameStore } from '../store/gameStore';
+import { buildBackgroundCss, resolveBackground } from '../cube/backgrounds';
 import { FidgetScene } from './FidgetScene';
 
 /**
- * Full-screen host for the experimental fidget-spinner mode. Renders the
- * iridescent cube canvas edge-to-edge with a single Back affordance overlay.
- * Kept intentionally chrome-light so the object stays the focus.
+ * Full-screen host for the fidget mode. Renders the iridescent cube canvas
+ * edge-to-edge on top of the user's chosen play-field background (same
+ * setting the puzzle mode uses via `settings.backgroundId`) so the fidget
+ * inherits whatever atmosphere the user picked from the settings gear.
+ *
+ * Video backgrounds are rendered as a <video> element behind the canvas
+ * (CSS `background` can't carry a video), with an overlay div for the
+ * theme's darken/vignette above the video and below the canvas.
  */
 export function FidgetLanding() {
   const setMenuView = useGameStore((s) => s.setMenuView);
+  const background = useGameStore((s) => resolveBackground(s.settings.backgroundId));
+  const isVideoBg = background.kind === 'video' && !!background.videoSrc;
+
   return (
     <div
       className="fixed inset-0 h-full w-full overflow-hidden"
       style={{
-        background:
-          'radial-gradient(circle at 50% 45%, #23283a 0%, #0a0c11 55%, #05070a 100%)',
+        background: isVideoBg ? background.color : buildBackgroundCss(background),
+        backgroundColor: background.color,
       }}
     >
+      {isVideoBg && (
+        <>
+          <video
+            key={background.videoSrc}
+            className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+            src={background.videoSrc}
+            poster={background.src}
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="auto"
+            aria-hidden="true"
+          />
+          {background.overlay && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0"
+              style={{ background: background.overlay }}
+            />
+          )}
+        </>
+      )}
+
       <FidgetScene />
 
       <button

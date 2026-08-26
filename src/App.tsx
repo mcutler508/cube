@@ -29,7 +29,7 @@ import { useGameStore } from './store/gameStore';
 import { usePlayerStore } from './store/playerStore';
 import { isSupabaseConfigured } from './auth/supabaseClient';
 import { PlayerSignInModal } from './components/Player/PlayerSignInModal';
-import { resolveBackground, type CubeBackground } from './cube/backgrounds';
+import { buildBackgroundCss, resolveBackground } from './cube/backgrounds';
 import { nextRequiredTutorialLevel } from './game/tutorial';
 import { loadTutorialLevel } from './game/levels/loader';
 
@@ -195,19 +195,3 @@ const screenTransitionCss = `
   }
 `;
 
-/**
- * Compose the CSS `background` shorthand for the level view. Layer order is
- * top-to-bottom in CSS: any overlay is painted above the image, and the fallback
- * solid color sits behind everything (visible until the image loads and behind
- * any letterboxed edges).
- */
-function buildBackgroundCss(bg: CubeBackground): string {
-  const layers: string[] = [];
-  if (bg.overlay) layers.push(bg.overlay);
-  if (bg.src) {
-    const size = bg.size ?? 'cover';
-    layers.push(`url("${bg.src}") center/${size} no-repeat`);
-  }
-  layers.push(bg.color);
-  return layers.join(', ');
-}

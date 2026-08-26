@@ -187,3 +187,24 @@ export const DEFAULT_BACKGROUND_ID = 'clouds';
 export function resolveBackground(id: string): CubeBackground {
   return BACKGROUNDS.find((b) => b.id === id) ?? BACKGROUNDS[0];
 }
+
+/**
+ * Compose the CSS `background` shorthand for a background. Layer order is
+ * top-to-bottom in CSS: any overlay is painted above the image, and the
+ * fallback solid color sits behind everything (visible until the image
+ * loads and behind any letterboxed edges).
+ *
+ * NOTE: for video backgrounds the caller renders a <video> element instead
+ * of using this string (CSS `background` can't carry a video source). Use
+ * `bg.color` as the CSS fallback and mount the video separately.
+ */
+export function buildBackgroundCss(bg: CubeBackground): string {
+  const layers: string[] = [];
+  if (bg.overlay) layers.push(bg.overlay);
+  if (bg.src) {
+    const size = bg.size ?? 'cover';
+    layers.push(`url("${bg.src}") center/${size} no-repeat`);
+  }
+  layers.push(bg.color);
+  return layers.join(', ');
+}
