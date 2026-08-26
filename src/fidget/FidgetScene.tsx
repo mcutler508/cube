@@ -22,19 +22,21 @@ import * as THREE from 'three';
  *     body-diagonal, so its faces/edges sweep past the scoop window every
  *     120° of rotation — that's the signature effect.
  *
- * Interaction (three concurrent gestures):
+ * Interaction (three gestures):
  *   - 1-finger swipe: spins the INNER around the spindle axis. Tap while
  *     spinning to catch.
- *   - 2-finger twist (fingers rotate around each other): spins the OUTER
- *     around the same spindle axis, independent direction and speed from
- *     the inner. Enables counter-rotation.
+ *   - 1 anchor + 1 flicker (2 fingers, one held still, other swiping):
+ *     "grab-and-flick" — the flicker's swipe drives the OUTER spin via the
+ *     same tangential-to-axis math as the inner spin. Physically models
+ *     pinching the assembly with one hand and flicking the outer with the
+ *     other. Enables counter-rotation of inner vs outer.
  *   - 2-finger drag (both fingers moving together): trackball-reorients the
- *     whole assembly in 3D so you can see it from any angle. Rotation applied
- *     to a parent group that wraps both meshes.
+ *     whole assembly in 3D so you can see it from any angle.
  *
- *   These are decomposed simultaneously from a two-finger gesture: the
- *   center-point motion drives trackball; the inter-finger angle drives
- *   outer twist. Both apply on the same pointermove.
+ *   The two-finger gestures are distinguished per-frame: if one of the two
+ *   pointers hasn't fired a pointermove in ~60ms (or its most recent delta
+ *   was <1.2px), it's treated as an anchor and the other drives outer spin.
+ *   Otherwise both are moving and we route to trackball.
  *
  * Physics: two independent scalar angular velocities (inner, outer), both
  * around the same body-diagonal spindle axis. Exp-decay friction is frame-
@@ -153,7 +155,6 @@ const SCOOP_LENGTH = 1.35;
 // Exp-decay friction per second (v *= friction^dt). 0.72 = ~20s glide from
 // a hard flick.
 const IDLE_FRICTION = 0.72;
-const CATCH_FRICTION = 0.001;
 const FLICK_SCALE = 0.02;
 const MAX_VELOCITY = 46;
 const RELEASE_WINDOW_MS = 90;
@@ -161,6 +162,17 @@ const RELEASE_WINDOW_MS = 90;
 // Two-finger center drag → trackball rotation. Pixels of drag per radian of
 // yaw/pitch on the parent group. ~300px = 90° reorient.
 const TRACKBALL_SCALE = 0.006;
+
+// Grab-and-flick detection: if a pointer hasn't fired a pointermove in this
+// many ms, it's treated as an "anchor" (finger held still). The other,
+// moving finger becomes the "flicker" that drives outer spin. Human fingers
+// held stationary don't fire pointermove events, so this reliably catches
+// intentional holds.
+const ANCHOR_STALE_MS = 60;
+// Fallback: even if a finger IS firing pointermove events (finger drift),
+// treat it as anchor if its most-recent move delta was below this — catches
+// the case where a "held" finger drifts a fraction of a pixel per frame.
+const ANCHOR_MICRO_MOVE_PX = 1.2;
 
 // Spindle axis in the assembly's LOCAL frame. Body-diagonal (1,1,1). Both the
 // inner and outer spin around this axis. The parent group (trackball) tilts
@@ -183,23 +195,30 @@ function FidgetAssembly() {
 
   // Multi-touch pointer tracking. We route based on active count:
   //   1 pointer → single-finger inner spin
-  //   2 pointers → two-finger mode (trackball + outer twist decomposed
-  //                simultaneously from the same movement)
+  //   2 pointers → two-finger mode. Per-move, we check which of the two
+  //                is "held still" (anchor) vs moving (flicker). If exactly
+  //                one is moving, moving finger's swipe drives OUTER spin.
+  //                If both are moving in parallel, center-delta drives the
+  //                trackball reorient.
   //   3+ ignored
-  const activePointers = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const activePointers = useRef<Map<number, {
+    x: number;
+    y: number;
+    lastMoveTime: number;
+    lastMoveDelta: number;
+  }>>(new Map());
 
   // Single-finger (inner) state.
   const innerDragActive = useRef(false);
   const innerLastPointer = useRef<{ x: number; y: number } | null>(null);
-  const innerIsCaught = useRef(false);
   const innerMotionHistory = useRef<Array<{ t: number; dx: number; dy: number }>>([]);
 
-  // Two-finger state.
+  // Two-finger state — trackball reorient + grab-and-flick outer spin.
   const twoFingerActive = useRef(false);
   const twoFingerLastCenter = useRef<{ x: number; y: number } | null>(null);
-  const twoFingerLastAngle = useRef<number | null>(null);
-  const outerIsCaught = useRef(false);
-  const outerAngleHistory = useRef<Array<{ t: number; dAngle: number }>>([]);
+  // Flicker's per-frame motion history — seeds the outer's release velocity
+  // when the flicker lifts (or when we exit two-finger mode).
+  const outerFlickHistory = useRef<Array<{ t: number; dx: number; dy: number }>>([]);
 
   const { size, camera } = useThree();
 
@@ -244,25 +263,20 @@ function FidgetAssembly() {
     const ps = Array.from(activePointers.current.values());
     return { x: (ps[0].x + ps[1].x) / 2, y: (ps[0].y + ps[1].y) / 2 };
   };
-  const computeAngle = () => {
-    const ps = Array.from(activePointers.current.values());
-    return Math.atan2(ps[1].y - ps[0].y, ps[1].x - ps[0].x);
-  };
 
   // --- mode transitions ---
+  // Deliberately no "catch on gesture start" — touching down (even mid-spin)
+  // should not slow the piece. Momentum belongs to the piece, not the finger.
+  // If the user wants to stop a spin, they drag against it or wait it out.
   const startInnerDrag = (x: number, y: number) => {
     innerDragActive.current = true;
-    innerIsCaught.current = Math.abs(innerVelocity.current) > 0.5;
-    if (innerIsCaught.current) pulseHaptic(18);
     innerLastPointer.current = { x, y };
     innerMotionHistory.current = [];
   };
 
   const cancelInnerDrag = () => {
-    // Used on transition to 2-finger — we don't want to fling the inner just
-    // because the user added a second finger.
+    // Used on transition to 2-finger — no fling seed, no velocity change.
     innerDragActive.current = false;
-    innerIsCaught.current = false;
     innerLastPointer.current = null;
     innerMotionHistory.current = [];
   };
@@ -272,11 +286,7 @@ function FidgetAssembly() {
     innerDragActive.current = false;
     const now = performance.now();
     const recent = innerMotionHistory.current.filter((s) => now - s.t <= RELEASE_WINDOW_MS);
-    if (recent.length === 0 || innerIsCaught.current) {
-      if (innerIsCaught.current) innerVelocity.current = 0;
-      innerIsCaught.current = false;
-      return;
-    }
+    if (recent.length === 0) return; // tap without motion: keep prior spin
     let sumDx = 0;
     let sumDy = 0;
     for (const s of recent) {
@@ -287,37 +297,49 @@ function FidgetAssembly() {
     const axis2 = projectAxisToScreen();
     const cross = sumDx * axis2.y - sumDy * axis2.x;
     const seed = (cross / dtSec) * FLICK_SCALE;
-    innerVelocity.current = THREE.MathUtils.clamp(seed, -MAX_VELOCITY, MAX_VELOCITY);
-    if (Math.abs(innerVelocity.current) > 4) pulseHaptic(10);
+    // ADD to existing velocity rather than replace — a flick on an already-
+    // spinning inner should push it faster (or slow it if the flick opposes).
+    innerVelocity.current = THREE.MathUtils.clamp(
+      innerVelocity.current + seed,
+      -MAX_VELOCITY,
+      MAX_VELOCITY,
+    );
+    if (Math.abs(seed) > 4) pulseHaptic(10);
   };
 
   const startTwoFinger = () => {
     twoFingerActive.current = true;
-    outerIsCaught.current = Math.abs(outerVelocity.current) > 0.5;
-    if (outerIsCaught.current) pulseHaptic(18);
     twoFingerLastCenter.current = computeCenter();
-    twoFingerLastAngle.current = computeAngle();
-    outerAngleHistory.current = [];
+    outerFlickHistory.current = [];
   };
 
   const endTwoFinger = () => {
     if (!twoFingerActive.current) return;
     twoFingerActive.current = false;
     const now = performance.now();
-    const recent = outerAngleHistory.current.filter((s) => now - s.t <= RELEASE_WINDOW_MS);
+    const recent = outerFlickHistory.current.filter((s) => now - s.t <= RELEASE_WINDOW_MS);
     twoFingerLastCenter.current = null;
-    twoFingerLastAngle.current = null;
-    if (recent.length === 0 || outerIsCaught.current) {
-      if (outerIsCaught.current) outerVelocity.current = 0;
-      outerIsCaught.current = false;
-      return;
+    if (recent.length === 0) return; // no flicker motion: keep prior outer spin
+    let sumDx = 0;
+    let sumDy = 0;
+    for (const s of recent) {
+      sumDx += s.dx;
+      sumDy += s.dy;
     }
-    let sumDA = 0;
-    for (const s of recent) sumDA += s.dAngle;
     const dtSec = Math.max(0.016, (now - recent[0].t) / 1000);
-    const seed = sumDA / dtSec;
-    outerVelocity.current = THREE.MathUtils.clamp(seed, -MAX_VELOCITY, MAX_VELOCITY);
-    if (Math.abs(outerVelocity.current) > 4) pulseHaptic(10);
+    // Same tangential-to-axis math as inner-spin release — outer feels
+    // continuous with the inner even though the input gesture differs.
+    const axis2 = projectAxisToScreen();
+    const cross = sumDx * axis2.y - sumDy * axis2.x;
+    const seed = (cross / dtSec) * FLICK_SCALE;
+    // ADD to existing velocity rather than replace — successive flicks
+    // accumulate; a reverse flick brakes.
+    outerVelocity.current = THREE.MathUtils.clamp(
+      outerVelocity.current + seed,
+      -MAX_VELOCITY,
+      MAX_VELOCITY,
+    );
+    if (Math.abs(seed) > 4) pulseHaptic(10);
   };
 
   // --- pointer handlers ---
@@ -325,7 +347,12 @@ function FidgetAssembly() {
     e.stopPropagation();
     (e.target as Element)?.setPointerCapture?.(e.pointerId);
     if (activePointers.current.has(e.pointerId)) return;
-    activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    activePointers.current.set(e.pointerId, {
+      x: e.clientX,
+      y: e.clientY,
+      lastMoveTime: performance.now(),
+      lastMoveDelta: 0,
+    });
     const n = activePointers.current.size;
     if (n === 1) {
       startInnerDrag(e.clientX, e.clientY);
@@ -341,52 +368,83 @@ function FidgetAssembly() {
 
   const onPointerMove = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
-      if (!activePointers.current.has(e.pointerId)) return;
-      activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      const prev = activePointers.current.get(e.pointerId);
+      if (!prev) return;
+      const now = performance.now();
+      const rawDx = e.clientX - prev.x;
+      const rawDy = e.clientY - prev.y;
+      const moveDelta = Math.hypot(rawDx, rawDy);
+      activePointers.current.set(e.pointerId, {
+        x: e.clientX,
+        y: e.clientY,
+        lastMoveTime: now,
+        lastMoveDelta: moveDelta,
+      });
       const n = activePointers.current.size;
 
       if (n === 1 && innerDragActive.current && innerLastPointer.current && innerRef.current) {
-        const rawDx = e.clientX - innerLastPointer.current.x;
-        const rawDy = e.clientY - innerLastPointer.current.y;
         innerLastPointer.current = { x: e.clientX, y: e.clientY };
         const { dx, dy } = normalize(rawDx, rawDy);
-        innerMotionHistory.current.push({ t: performance.now(), dx, dy });
+        innerMotionHistory.current.push({ t: now, dx, dy });
         if (innerMotionHistory.current.length > 32) innerMotionHistory.current.shift();
         innerRef.current.rotateOnAxis(SPIN_AXIS, swipeToInnerSpinDelta(dx, dy));
         return;
       }
 
-      if (n >= 2 && twoFingerActive.current && twoFingerLastCenter.current && twoFingerLastAngle.current !== null) {
-        // Trackball: center-point delta → yaw/pitch on the parent. We apply
-        // via world-axis quaternions (not local Euler) so successive drags
-        // compose without axis drift.
-        const center = computeCenter();
-        const centerDx = center.x - twoFingerLastCenter.current.x;
-        const centerDy = center.y - twoFingerLastCenter.current.y;
-        twoFingerLastCenter.current = center;
-        if (parentRef.current) {
-          const yawQ = new THREE.Quaternion().setFromAxisAngle(
-            new THREE.Vector3(0, 1, 0),
-            centerDx * TRACKBALL_SCALE,
-          );
-          const pitchQ = new THREE.Quaternion().setFromAxisAngle(
-            new THREE.Vector3(1, 0, 0),
-            centerDy * TRACKBALL_SCALE,
-          );
-          parentRef.current.quaternion.premultiply(yawQ).premultiply(pitchQ);
+      if (n >= 2 && twoFingerActive.current) {
+        // Find the OTHER finger (not the one that just moved) and decide if
+        // it's currently acting as an anchor (held still). Two signals count:
+        //   1. It hasn't fired a pointermove in ANCHOR_STALE_MS.
+        //   2. Its most-recent move delta was smaller than ANCHOR_MICRO_MOVE_PX
+        //      — catches finger drift where events keep firing but by <1px.
+        // If exactly one finger is anchoring, the other is the flicker →
+        // grab-and-flick outer spin. Otherwise both are moving → trackball.
+        let other:
+          | { x: number; y: number; lastMoveTime: number; lastMoveDelta: number }
+          | undefined;
+        for (const [id, data] of activePointers.current) {
+          if (id !== e.pointerId) {
+            other = data;
+            break;
+          }
         }
+        if (!other) return;
+        const otherStale = now - other.lastMoveTime > ANCHOR_STALE_MS;
+        const otherMicro = other.lastMoveDelta < ANCHOR_MICRO_MOVE_PX;
+        const otherIsAnchor = otherStale || otherMicro;
 
-        // Outer twist: change in inter-finger angle → rotation around
-        // spindle axis. Wrapped to [-π, π] so crossing the atan2 branch cut
-        // doesn't cause a huge spurious jump.
-        const angle = computeAngle();
-        let dAngle = angle - twoFingerLastAngle.current;
-        if (dAngle > Math.PI) dAngle -= 2 * Math.PI;
-        if (dAngle < -Math.PI) dAngle += 2 * Math.PI;
-        twoFingerLastAngle.current = angle;
-        outerAngleHistory.current.push({ t: performance.now(), dAngle });
-        if (outerAngleHistory.current.length > 32) outerAngleHistory.current.shift();
-        if (outerRef.current) outerRef.current.rotateOnAxis(SPIN_AXIS, dAngle);
+        if (otherIsAnchor) {
+          // Grab-and-flick: THIS finger drives outer spin via the same
+          // tangential-to-axis math as the 1-finger inner spin.
+          const { dx, dy } = normalize(rawDx, rawDy);
+          outerFlickHistory.current.push({ t: now, dx, dy });
+          if (outerFlickHistory.current.length > 32) outerFlickHistory.current.shift();
+          if (outerRef.current) {
+            outerRef.current.rotateOnAxis(SPIN_AXIS, swipeToInnerSpinDelta(dx, dy));
+          }
+          // Keep lastCenter in sync silently so if the user transitions from
+          // flick → trackball, the next center-delta doesn't jump.
+          twoFingerLastCenter.current = computeCenter();
+        } else if (twoFingerLastCenter.current) {
+          // Both fingers moving → trackball reorient of the parent group.
+          // Center-delta drives yaw/pitch via world-axis quaternions (not
+          // local Euler) so successive drags compose without axis drift.
+          const center = computeCenter();
+          const centerDx = center.x - twoFingerLastCenter.current.x;
+          const centerDy = center.y - twoFingerLastCenter.current.y;
+          twoFingerLastCenter.current = center;
+          if (parentRef.current) {
+            const yawQ = new THREE.Quaternion().setFromAxisAngle(
+              new THREE.Vector3(0, 1, 0),
+              centerDx * TRACKBALL_SCALE,
+            );
+            const pitchQ = new THREE.Quaternion().setFromAxisAngle(
+              new THREE.Vector3(1, 0, 0),
+              centerDy * TRACKBALL_SCALE,
+            );
+            parentRef.current.quaternion.premultiply(yawQ).premultiply(pitchQ);
+          }
+        }
       }
     },
     [normalize, swipeToInnerSpinDelta],
@@ -406,8 +464,9 @@ function FidgetAssembly() {
     }
     if (n === 1 && twoFingerActive.current) {
       // Went from 2 → 1 fingers. End two-finger cleanly (seeds outer fling
-      // from angle history), then start a fresh single-finger drag on the
-      // remaining pointer so the user can transition mid-gesture.
+      // from flick history if there was recent flicker motion), then start
+      // a fresh single-finger drag on the remaining pointer so the user
+      // can transition mid-gesture.
       endTwoFinger();
       const [remaining] = activePointers.current.values();
       startInnerDrag(remaining.x, remaining.y);
@@ -419,22 +478,23 @@ function FidgetAssembly() {
   useFrame((_state, delta) => {
     const dt = Math.min(0.05, delta);
 
-    // Inner spin — decays even while user is two-fingering (inner is idle
-    // then), just not while user is actively dragging with one finger.
+    // Both pieces continue their spin every frame, regardless of what the
+    // fingers are currently doing. This is the key fix: previously we froze
+    // velocity-driven rotation while a drag was active, which meant that
+    // touching down to start a trackball gesture visibly stopped an already-
+    // spinning inner. Now direct-drag rotation (from pointermove) composes
+    // ON TOP of the velocity-driven rotation, so a spinning piece keeps
+    // spinning through any concurrent finger activity.
     const inner = innerRef.current;
-    if (inner && !innerDragActive.current) {
+    if (inner) {
       inner.rotateOnAxis(SPIN_AXIS, innerVelocity.current * dt);
-      const f = innerIsCaught.current ? CATCH_FRICTION : IDLE_FRICTION;
-      innerVelocity.current *= Math.pow(f, dt);
+      innerVelocity.current *= Math.pow(IDLE_FRICTION, dt);
       if (Math.abs(innerVelocity.current) < 0.02) innerVelocity.current = 0;
     }
-
-    // Outer spin — decays only when not being actively twisted.
     const outer = outerRef.current;
-    if (outer && !twoFingerActive.current) {
+    if (outer) {
       outer.rotateOnAxis(SPIN_AXIS, outerVelocity.current * dt);
-      const f = outerIsCaught.current ? CATCH_FRICTION : IDLE_FRICTION;
-      outerVelocity.current *= Math.pow(f, dt);
+      outerVelocity.current *= Math.pow(IDLE_FRICTION, dt);
       if (Math.abs(outerVelocity.current) < 0.02) outerVelocity.current = 0;
     }
   });
