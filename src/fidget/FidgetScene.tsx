@@ -2,7 +2,7 @@ import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { Environment, ContactShadows } from '@react-three/drei';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { Brush, Evaluator, SUBTRACTION, INTERSECTION } from 'three-bvh-csg';
-import { Suspense, useCallback, useMemo, useRef } from 'react';
+import { Suspense, useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 
 /**
@@ -44,22 +44,52 @@ import * as THREE from 'three';
  * a studio HDRI = PVD oil-slick chrome from the spec sheet. Shared between
  * inner + outer so they read as one piece when aligned.
  */
+// Match FOV + fit-to-viewport math to CubeScene so the fidget renders at
+// roughly the same on-screen footprint as the 3x3 puzzle cube. TARGET_RADIUS
+// is tuned so the fidget's ~1.0 world-unit bounding sphere fills the same
+// fraction of the frame as the 3x3's ~2.55-unit bounding (see CubeScene.tsx
+// TARGET_RADIUS_3X3 = 2.85 for the reference ratio).
+const FIDGET_FOV = 38;
+const FIDGET_TARGET_RADIUS = 1.15;
+
+function computeCameraPosition(
+  width: number,
+  height: number,
+  targetRadius: number,
+): [number, number, number] {
+  const aspect = Math.max(0.01, width / Math.max(1, height));
+  const fovRad = (FIDGET_FOV * Math.PI) / 180;
+  const distForHeight = targetRadius / Math.tan(fovRad / 2);
+  const distForWidth = targetRadius / (Math.tan(fovRad / 2) * aspect);
+  const dist = Math.max(distForHeight, distForWidth);
+  // Same three-quarter angled view as the main cube — keeps the two modes
+  // visually consistent.
+  return [dist * 0.48, dist * 0.5, dist * 0.64];
+}
+
 export function FidgetScene() {
+  const initial = computeCameraPosition(
+    typeof window !== 'undefined' ? window.innerWidth : 1280,
+    typeof window !== 'undefined' ? window.innerHeight : 800,
+    FIDGET_TARGET_RADIUS,
+  );
   return (
     <Canvas
       dpr={[1, 2]}
       gl={{ antialias: true, powerPreference: 'high-performance' }}
-      camera={{ position: [0, 0.3, 4.4], fov: 26 }}
-      onCreated={({ gl }) => {
+      camera={{ position: initial, fov: FIDGET_FOV }}
+      onCreated={({ gl, camera }) => {
         gl.setClearColor('#000000', 0);
         gl.toneMapping = THREE.ACESFilmicToneMapping;
         gl.toneMappingExposure = 1.15;
+        camera.lookAt(0, 0, 0);
       }}
     >
       <ambientLight intensity={0.25} />
       <directionalLight position={[4, 6, 3]} intensity={0.6} color="#ffe6c4" />
       <directionalLight position={[-5, 2, -3]} intensity={0.35} color="#8ea6ff" />
 
+      <ResponsiveCamera />
       <Suspense fallback={null}>
         <Environment preset="studio" background={false} />
         <FidgetAssembly />
@@ -75,6 +105,38 @@ export function FidgetScene() {
       </Suspense>
     </Canvas>
   );
+}
+
+/**
+ * Push camera in/out based on viewport aspect so the cube stays the same
+ * apparent size on portrait phones and landscape tablets — mirrors the
+ * ResponsiveCamera pattern in CubeScene. useLayoutEffect ensures the initial
+ * placement lands before the first paint, avoiding a one-frame flash.
+ */
+function ResponsiveCamera() {
+  const { camera, gl } = useThree();
+  useLayoutEffect(() => {
+    if (!(camera instanceof THREE.PerspectiveCamera)) return;
+    const measure = () => {
+      const el = gl.domElement;
+      const rect = el.getBoundingClientRect();
+      const w = rect.width || el.clientWidth || window.innerWidth;
+      const h = rect.height || el.clientHeight || window.innerHeight;
+      const [x, y, z] = computeCameraPosition(w, h, FIDGET_TARGET_RADIUS);
+      camera.position.set(x, y, z);
+      camera.aspect = w / h;
+      camera.lookAt(0, 0, 0);
+      camera.updateProjectionMatrix();
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    window.addEventListener('orientationchange', measure);
+    return () => {
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('orientationchange', measure);
+    };
+  }, [camera, gl]);
+  return null;
 }
 
 // --- geometry constants ---
