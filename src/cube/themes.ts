@@ -350,6 +350,60 @@ export const THEMES: readonly CubeTheme[] = [
     },
     reticle: { color: '#ffffff', intensityScale: 1.1 },
   },
+  {
+    // Hardened steel with 4-layer PVD iridescent coating — modeled on the
+    // Galaxy Fidget Cube CAD spec. Full-chrome metal is non-negotiable per
+    // user direction (metalness slightly past 1.0 to push the specular tint
+    // as hard as the shader allows). To keep faces distinguishable under
+    // full chrome — where diffuse color is almost fully replaced by
+    // reflection — we lean on three signals in the ORDER they read:
+    //   1. Highly saturated base colors: at full metal the reflection is
+    //      tinted by base color, so bold pigment survives as a colored
+    //      specular even though the diffuse layer is minimal.
+    //   2. Per-face baseEmissiveIntensity: adds an independent color source
+    //      not dependent on lighting or reflections — makes the face color
+    //      readable even in dark reflections.
+    //   3. Iridescence sweep on top: rainbow shimmer that shifts with view
+    //      angle, giving the overall PVD look regardless of face color.
+    //
+    // Clearcoat + tight clearcoatRoughness carry the wet mirror-like PVD
+    // topcoat.
+    id: 'galaxy',
+    name: 'Galaxy',
+    colors: {
+      up: '#f0f2f8',      // pearl white
+      down: '#ffb400',    // saturated gold
+      front: '#2378ff',   // saturated cobalt
+      back: '#ff2a8a',    // hot magenta
+      left: '#00c48c',    // vivid emerald
+      right: '#ff5a1a',   // hot coral
+    },
+    material: {
+      roughness: 0.15,
+      metalness: 1.1,
+      envMapIntensity: 1.8,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.06,
+      iridescence: 1.0,
+      iridescenceIOR: 1.4,
+      // Wide nanometer range → full spectrum rainbow shift across surface
+      // normals. Narrower would give a subtler pastel shimmer.
+      iridescenceThicknessRange: [110, 820],
+      sheen: 0,
+      sheenColor: '#ffffff',
+      ior: 1.7,
+      anisotropy: 0,
+      anisotropyRotation: 0,
+      specularIntensity: 1.0,
+      specularColor: '#ffffff',
+      // Subtle per-face glow. Emissive is added AFTER reflection/iridescence,
+      // so it survives full metalness and keeps each face's color readable
+      // even when a face is caught in a dark reflection. Kept low so faces
+      // still read as reflective metal, not neon.
+      baseEmissiveIntensity: 0.14,
+    },
+    reticle: { color: '#f0f4ff', intensityScale: 1.0 },
+  },
 ];
 
 /** Resolve a themeId to a theme object, falling back to the first theme
