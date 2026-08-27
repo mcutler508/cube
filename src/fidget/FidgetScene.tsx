@@ -2,8 +2,9 @@ import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { Environment, ContactShadows, SpotLight } from '@react-three/drei';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { Brush, Evaluator, SUBTRACTION, INTERSECTION } from 'three-bvh-csg';
-import { Suspense, useCallback, useLayoutEffect, useMemo, useRef } from 'react';
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
+import { setFidgetIntensity, stopFidgetSound } from './fidgetSound';
 
 /**
  * Galaxy Fidget Cube — outer shell + inner core assembly.
@@ -518,7 +519,25 @@ function FidgetAssembly() {
       outerVelocity.current *= Math.pow(IDLE_FRICTION, dt);
       if (Math.abs(outerVelocity.current) < 0.02) outerVelocity.current = 0;
     }
+
+    // Bearing sound intensity — combined absolute velocity of both pieces,
+    // normalized by MAX_VELOCITY (a hard flick on one piece maxes it out).
+    // Passed through pow(0.7) so the low end ramps up faster and the ceiling
+    // is smoother — sounds less "on/off" than a linear mapping.
+    const combined =
+      (Math.abs(innerVelocity.current) + Math.abs(outerVelocity.current)) / MAX_VELOCITY;
+    const norm = Math.min(1, combined);
+    setFidgetIntensity(Math.pow(norm, 0.7));
   });
+
+  // Tear down the audio graph when the fidget scene unmounts — otherwise
+  // the pink-noise source keeps running silent in the background after the
+  // user leaves the mode.
+  useEffect(() => {
+    return () => {
+      stopFidgetSound();
+    };
+  }, []);
 
   return (
     <>
