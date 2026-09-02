@@ -1,15 +1,22 @@
 import { useEffect, useState } from 'react';
+import { useGameStore } from '../../store/gameStore';
+import { exitToMenu } from '../../game/levels/loader';
 
 /**
  * Guards the browser back button. On mount we push a sentinel entry onto
  * history so the first `popstate` (e.g. the phone's back gesture) lands us
- * back on our own entry — at which point we open a confirm modal instead of
- * letting the browser leave the page. Choosing "Exit" pops one more time to
- * actually leave; "Stay" re-arms the guard by pushing a fresh sentinel.
+ * back on our own entry — at which point we react instead of letting the
+ * browser leave the page.
  *
- * Deliberately mounted once at the top of App so it protects every screen —
- * menu views and in-level gameplay alike. The extra history entry is a
- * one-time cost per session, invisible to the user.
+ * Back-gesture behavior depends on where the user is:
+ *  - Mid-level (and not the forced first-run tutorial): return to the main
+ *    menu. Prompting "Exit the app?" while solving surprised users who
+ *    expected a normal in-app back.
+ *  - Menu / tutorial run: open the confirm modal. Choosing "Exit" pops
+ *    once more to actually leave; "Stay" re-arms the guard.
+ *
+ * Deliberately mounted once at the top of App so it protects every screen.
+ * The extra history entry is a one-time cost per session, invisible.
  */
 export function ExitConfirmModal() {
   const [open, setOpen] = useState(false);
@@ -27,6 +34,16 @@ export function ExitConfirmModal() {
       // Only treat this as an exit intent when the pop went *past* the guard.
       const s = e.state as { __cubeExitGuard?: boolean } | null;
       if (s && s.__cubeExitGuard) return;
+
+      // Mid-level: back = return to menu, not "exit the app".
+      // Tutorial run is exempt so the forced intro can't be skipped.
+      const state = useGameStore.getState();
+      if (state.currentLevel && !state.isTutorialRun) {
+        exitToMenu();
+        // Re-arm the sentinel so the next back on the menu is intercepted.
+        window.history.pushState({ __cubeExitGuard: true }, '');
+        return;
+      }
       setOpen(true);
     };
     window.addEventListener('popstate', onPop);
