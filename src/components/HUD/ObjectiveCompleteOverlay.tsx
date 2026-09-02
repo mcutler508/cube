@@ -38,9 +38,19 @@ export function ObjectiveCompleteOverlay() {
   if (!shouldShow || !level || !snapshot) return null;
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/55 backdrop-blur-md animate-[fadein_320ms_ease-out]" />
-      <div className="pointer-events-auto relative flex w-full max-w-sm flex-col items-center px-6 py-6">
+    <div className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center px-6">
+      <div
+        className="absolute inset-0 animate-[fadein_320ms_ease-out]"
+        style={{
+          background: 'rgba(6,8,12,0.55)',
+          backdropFilter: 'blur(18px) saturate(140%)',
+          WebkitBackdropFilter: 'blur(18px) saturate(140%)',
+        }}
+      />
+      <div
+        className="premium-panel pointer-events-auto relative flex w-full max-w-sm flex-col items-center px-6 py-6"
+        style={{ animation: 'panelIn 320ms cubic-bezier(0.16, 1, 0.3, 1)' }}
+      >
         <div
           className="text-[11px] font-semibold uppercase tracking-[0.4em] text-emerald-300/90"
           style={{ animation: 'popup 320ms ease-out' }}
@@ -71,6 +81,10 @@ export function ObjectiveCompleteOverlay() {
         @keyframes popup {
           from { opacity: 0; transform: translateY(8px); }
           to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes panelIn {
+          from { opacity: 0; transform: translateY(10px) scale(0.97); }
+          to   { opacity: 1; transform: translateY(0)   scale(1);    }
         }
       `}</style>
     </div>

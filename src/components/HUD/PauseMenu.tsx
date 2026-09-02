@@ -63,20 +63,30 @@ export function PauseMenu() {
         type="button"
         aria-label="Resume"
         onClick={close}
-        className="absolute inset-0 bg-black/65 backdrop-blur-md animate-[scrimIn_180ms_ease-out]"
+        className="absolute inset-0 animate-[scrimIn_200ms_ease-out]"
+        style={{
+          background: 'rgba(6,8,12,0.55)',
+          backdropFilter: 'blur(18px) saturate(140%)',
+          WebkitBackdropFilter: 'blur(18px) saturate(140%)',
+        }}
       />
       <div
-        className="relative z-10 w-[min(22rem,88vw)] rounded-2xl bg-neutral-950/90 p-5 ring-1 ring-white/[0.08] shadow-2xl shadow-black/50 animate-[menuIn_220ms_cubic-bezier(0.16,1,0.3,1)]"
+        className="premium-panel relative z-10 w-[min(22rem,88vw)] p-5 animate-[menuIn_260ms_cubic-bezier(0.16,1,0.3,1)]"
       >
         <div className="flex items-center justify-between pb-3">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.28em] text-white/45">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.28em] text-white/50">
             Paused
           </span>
           <button
             type="button"
             aria-label="Resume"
             onClick={close}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.06] text-white/70 ring-1 ring-white/[0.08] hover:bg-white/[0.12] hover:text-white active:scale-95"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-white/75 transition-all active:scale-95"
+            style={{
+              background: 'rgba(255,255,255,0.06)',
+              boxShadow:
+                'inset 0 1px 0 rgba(255,255,255,0.12), inset 0 0 0 1px rgba(255,255,255,0.1)',
+            }}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
@@ -116,15 +126,13 @@ function MenuButton({
   primary?: boolean;
   tone?: 'danger';
 }) {
-  const base =
-    'w-full rounded-xl px-4 py-3 text-sm font-medium tracking-wide transition-all active:scale-[0.98]';
-  const style = primary
-    ? 'bg-white text-black shadow-md shadow-black/30 hover:bg-white/95'
+  const cls = primary
+    ? 'premium-btn-primary w-full'
     : tone === 'danger'
-      ? 'bg-white/[0.04] text-red-200/85 ring-1 ring-red-300/15 hover:bg-red-500/10 hover:text-red-100'
-      : 'bg-white/[0.05] text-white/85 ring-1 ring-white/[0.08] hover:bg-white/[0.10] hover:text-white';
+      ? 'premium-btn-danger w-full'
+      : 'premium-btn-secondary w-full';
   return (
-    <button type="button" onClick={onClick} className={`${base} ${style}`}>
+    <button type="button" onClick={onClick} className={cls}>
       {label}
     </button>
   );

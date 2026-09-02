@@ -32,8 +32,15 @@ export function SolvedSequence() {
   if (!currentLevel) return null;
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/62 backdrop-blur-md animate-[fadein 500ms ease-out]" />
+    <div className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center px-6">
+      <div
+        className="absolute inset-0 animate-[fadein_500ms_ease-out]"
+        style={{
+          background: 'rgba(6,8,12,0.55)',
+          backdropFilter: 'blur(18px) saturate(140%)',
+          WebkitBackdropFilter: 'blur(18px) saturate(140%)',
+        }}
+      />
       <div
         className="absolute inset-0"
         style={{
@@ -46,7 +53,10 @@ export function SolvedSequence() {
       {/* Sparkle rays radiating from the SOLVED word */}
       <SparkleRays />
 
-      <div className="pointer-events-auto relative flex w-full max-w-md flex-col items-center px-6 py-6">
+      <div
+        className="premium-panel pointer-events-auto relative flex w-full max-w-md flex-col items-center px-6 py-6"
+        style={{ animation: 'panelIn 360ms cubic-bezier(0.16, 1, 0.3, 1)' }}
+      >
         <div
           className="text-[11px] font-semibold uppercase tracking-[0.4em] text-emerald-300/90"
           style={{ animation: 'popup 400ms ease-out' }}
@@ -91,6 +101,10 @@ export function SolvedSequence() {
 
       <style>{`
         @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes panelIn {
+          from { opacity: 0; transform: translateY(10px) scale(0.97); }
+          to   { opacity: 1; transform: translateY(0)   scale(1);    }
+        }
         @keyframes solveburst {
           0% { opacity: 0; transform: scale(0.6); }
           40% { opacity: 1; }

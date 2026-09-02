@@ -131,7 +131,15 @@ function StatCard({
   hint?: string;
 }) {
   return (
-    <div className="rounded-2xl bg-white/[0.06] px-3 py-2.5 ring-1 ring-white/10">
+    <div
+      className="rounded-2xl px-3 py-2.5"
+      style={{
+        background:
+          'linear-gradient(180deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.03) 100%)',
+        boxShadow:
+          'inset 0 1px 0 rgba(255,255,255,0.1), inset 0 0 0 1px rgba(255,255,255,0.08)',
+      }}
+    >
       <div className="text-[9px] uppercase tracking-[0.22em] text-white/45">{label}</div>
       <div className="mt-0.5 font-mono text-lg tabular-nums text-white">{value}</div>
       {hint && (
@@ -153,12 +161,36 @@ function ActionButton({
   primary?: boolean;
 }) {
   const base =
-    'min-w-[86px] rounded-full px-5 py-2.5 text-sm font-medium tracking-wide transition-all active:scale-95';
-  const style = primary
-    ? 'bg-white text-black shadow-lg shadow-black/40 hover:bg-white/95'
-    : 'bg-white/[0.08] text-white/85 ring-1 ring-white/10 hover:bg-white/15';
+    'min-w-[86px] rounded-full px-5 py-2.5 text-sm font-semibold tracking-wide transition-all active:scale-95';
+  if (primary) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`${base} text-[#0b0d12]`}
+        style={{
+          background: 'linear-gradient(180deg, #ffffff 0%, #ececef 100%)',
+          boxShadow:
+            'inset 0 1px 0 rgba(255,255,255,0.9), 0 8px 22px -6px rgba(0,0,0,0.65), 0 1px 0 rgba(0,0,0,0.25)',
+        }}
+      >
+        {children}
+      </button>
+    );
+  }
   return (
-    <button type="button" onClick={onClick} className={`${base} ${style}`}>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`${base} text-white/88`}
+      style={{
+        background: 'rgba(255,255,255,0.06)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        boxShadow:
+          'inset 0 1px 0 rgba(255,255,255,0.12), inset 0 0 0 1px rgba(255,255,255,0.1)',
+      }}
+    >
       {children}
     </button>
   );
